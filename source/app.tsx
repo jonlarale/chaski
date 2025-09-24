@@ -1,6 +1,6 @@
 // src/index.tsx
 import React, {useState, useEffect} from 'react';
-import {render, Box, useApp, useInput, useStdout} from 'ink';
+import {Box, useApp, useInput, useStdout} from 'ink';
 import FolderList from './components/FolderList.js';
 import MessageList from './components/MessageList.js';
 import CommandBar from './components/CommandBar.js';
@@ -945,4 +945,4 @@ const App = () => {
 	}
 };
 
-render(<App />);
+export default App;

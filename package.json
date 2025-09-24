@@ -10,7 +10,7 @@
 	"scripts": {
 		"build": "tsc",
 		"dev": "tsc --watch",
-		"start": "tsx source/app.tsx",
+		"start": "tsx source/start.tsx",
 		"test": "prettier --check . && xo && ava"
 	},
 	"files": [

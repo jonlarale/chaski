@@ -46,6 +46,7 @@ const CommandInput: React.FC<CommandInputProps> = ({
 		{cmd: '/compose', desc: 'Compose new email'},
 		{cmd: '/clear', desc: 'Exit command input'},
 		{cmd: '/help', desc: 'Show all commands'},
+		{cmd: '/assistant-clear', desc: 'Clear assistant conversation'},
 		{cmd: '/quit', desc: 'Exit the application'},
 	];
 
@@ -198,13 +199,13 @@ const CommandInput: React.FC<CommandInputProps> = ({
 									value={inputValue}
 									onChange={setInputValue}
 									onSubmit={handleSubmit}
-									placeholder="Type / for commands..."
+									placeholder="Ask about your mail or type / for commands..."
 									focus={true}
 								/>
 							</Box>
 						) : (
 							<Text color={semanticColors.command.placeholder}>
-								Press Tab to activate command input
+								Press Tab to ask the assistant or run commands
 							</Text>
 						)}
 					</Box>

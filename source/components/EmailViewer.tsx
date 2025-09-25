@@ -2,8 +2,10 @@ import React, {useState, useMemo, useEffect, useRef} from 'react';
 import {Box, Text, useInput, useStdout} from 'ink';
 import CommandBar from './CommandBar.js';
 import CommandInput from './CommandInput.js';
+import AssistantPanel from './AssistantPanel.js';
 import {colors, semanticColors, spacing} from '../constants/index.js';
 import {DownloadService} from '../services/downloadService.js';
+import {AssistantMessage, AssistantStatus} from '../types/assistant.js';
 
 interface Message {
 	id: string;
@@ -34,6 +36,9 @@ interface EmailViewerProps {
 	onCommandInputDeactivate: () => void;
 	onCommand: (command: string) => void;
 	downloadService?: DownloadService;
+	assistantMessages: AssistantMessage[];
+	assistantStatus: AssistantStatus;
+	assistantError?: string | null;
 }
 
 const EmailViewer: React.FC<EmailViewerProps> = ({
@@ -45,6 +50,9 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 	onCommandInputDeactivate,
 	onCommand,
 	downloadService,
+	assistantMessages,
+	assistantStatus,
+	assistantError,
 }) => {
 	const [scrollPosition, setScrollPosition] = useState(0);
 	const [scrollVelocity, setScrollVelocity] = useState(1);
@@ -438,6 +446,11 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 
 			{/* Command Input */}
 			<Box flexDirection="column" width="100%">
+				<AssistantPanel
+					messages={assistantMessages}
+					status={assistantStatus}
+					error={assistantError}
+				/>
 				<CommandInput
 					isActive={commandInputActive}
 					onDeactivate={onCommandInputDeactivate}

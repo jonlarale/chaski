@@ -17,6 +17,7 @@ A secure, feature-rich terminal-based email client built with React (Ink) and Ty
 - 🔒 **Secure Credential Storage** - Encrypted password storage with XOR encryption
 - 🔄 **Auto-Refresh** - Configurable automatic email synchronization
 - 💾 **Smart Caching** - SQLite-based message caching for offline access
+- 🤖 **AI Inbox Assistant** - Ask contextual questions about your mail directly from the command bar (OpenAI key required)
 - ⌨️ **Vim-style Navigation** - Intuitive keyboard shortcuts
 - 🎨 **Beautiful TUI** - Clean, responsive terminal interface
 - 📝 **Full Email Capabilities** - Read, compose, reply, and forward emails
@@ -74,6 +75,19 @@ npm start
    - Press `Enter` to read an email
    - Press `Tab` to switch between folders and messages
    - Press `c` to compose a new email
+4. Ask the assistant:
+   - Activate the bar with `Tab` and type your question without a leading `/` to get a summary.
+   - Use `/assistant-clear` if you need to reset the thread.
+
+## AI Assistant
+
+Chaski includes a contextual assistant that answers questions about the email already synced to your machine. To enable it:
+
+1. Create a `.env` file in the project root (or export the variables another way).
+2. Set your OpenAI key as `OPENAI_API_KEY` (the aliases `OPENAI_KEY` and `OPENAI_TOKEN` also work).
+3. Run the app with `npm start` or `chaski`; the process loads `.env` automatically.
+
+Once configured, type any message without a leading `/` in the command bar to chat with the assistant. The bottom panel surfaces the recent history and request status. Use `/assistant-clear` whenever you need a fresh conversation. The default model is `gpt-4o-mini`, and only local mail summaries are sent—no unrelated data leaves your machine.
 
 ## Configuration
 
@@ -140,6 +154,12 @@ OUTLOOK_CLIENT_ID=your_microsoft_client_id
 OUTLOOK_CLIENT_SECRET=your_microsoft_client_secret
 ```
 
+To unlock the AI assistant, add your OpenAI key as well:
+
+```bash
+OPENAI_API_KEY=sk-live-your-key
+```
+
 ## Security
 
 ### Credential Storage
@@ -184,6 +204,7 @@ Press `/` to open the command palette:
 | `/cache-status`              | Show cache statistics               |
 | `/cache-clear`               | Clear all cached data               |
 | `/settings`                  | Open settings dialog                |
+| `/assistant-clear`          | Reset assistant conversation        |
 | `/help`                      | Show all commands                   |
 | `/quit`                      | Exit the application                |
 

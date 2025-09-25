@@ -4,6 +4,7 @@ import {Box, useApp, useInput, useStdout} from 'ink';
 import FolderList from './components/FolderList.js';
 import MessageList from './components/MessageList.js';
 import CommandBar from './components/CommandBar.js';
+import AssistantPanel from './components/AssistantPanel.js';
 import EmailViewer from './components/EmailViewer.js';
 import ThreadViewer from './components/ThreadViewer.js';
 import EmailComposer from './components/EmailComposer.js';
@@ -15,6 +16,8 @@ import {EmailService} from './services/emailService.js';
 import {SettingsService} from './services/settingsService.js';
 import {CacheService} from './services/cacheService.js';
 import {DownloadService} from './services/downloadService.js';
+import AssistantService from './services/assistantService.js';
+import {AssistantMessage, AssistantStatus} from './types/assistant.js';
 import {EmailAccount, EmailMessage} from './types/email.js';
 import {RefreshStatus} from './types/refresh.js';
 import fs from 'fs';
@@ -93,6 +96,10 @@ const App = () => {
 		isRefreshing: false,
 	});
 	const [refreshTrigger, setRefreshTrigger] = useState(0);
+	const [assistantService] = useState(() => new AssistantService());
+	const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
+	const [assistantStatus, setAssistantStatus] = useState<AssistantStatus>('idle');
+	const [assistantError, setAssistantError] = useState<string | null>(null);
 	const app = useApp();
 	const {stdout} = useStdout();
 
@@ -120,7 +127,137 @@ const App = () => {
 	}, [emailService]);
 
 	// Get available account emails
-	const availableAccounts = emailAccounts.map(acc => acc.email);
+	const availableAccounts = emailAccounts.map(account => account.email);
+
+	const createAssistantMessage = (
+		role: 'user' | 'assistant',
+		content: string,
+	): AssistantMessage => ({
+		id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+		role,
+		content,
+		createdAt: new Date(),
+	});
+
+	const gatherAssistantContext = async () => {
+		const folderCandidate =
+			openedEmail?._original?.folder ||
+			openedThread?._original?.folder ||
+			selectedFolder ||
+			'INBOX';
+		const accountIdFromMessage =
+			openedEmail?._original?.accountId ||
+			openedThread?._original?.accountId;
+		const accountFromMessage = accountIdFromMessage
+			? emailAccounts.find(acc => acc.id === accountIdFromMessage)
+			: undefined;
+		const accountFromSelection = selectedAccount
+			? emailAccounts.find(acc => acc.email === selectedAccount)
+			: undefined;
+		const account = accountFromMessage || accountFromSelection || emailAccounts[0];
+
+		if (!account) {
+			return assistantService.buildContextSnapshot([], {
+				account: selectedAccount,
+				folder: folderCandidate,
+			});
+		}
+
+		let contextEmails: EmailMessage[] = [];
+
+		try {
+			contextEmails = await cacheService.getCachedMessages(
+				folderCandidate,
+				account.id,
+				20,
+				0,
+			);
+		} catch (error) {
+			debugLog('App.tsx', 'Assistant cache lookup failed', {
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
+
+		if (!contextEmails.length) {
+			try {
+				contextEmails = await emailService.getMessages(
+					account.id,
+					folderCandidate,
+					20,
+				);
+			} catch (error) {
+				debugLog('App.tsx', 'Assistant message fetch failed', {
+					error: error instanceof Error ? error.message : String(error),
+				});
+			}
+		}
+
+		const pinnedMessage = openedEmail?._original || openedThread?._original;
+		if (pinnedMessage) {
+			contextEmails = [
+				pinnedMessage,
+				...contextEmails.filter(email => email.id !== pinnedMessage.id),
+			];
+		}
+
+		return assistantService.buildContextSnapshot(contextEmails, {
+			account: account.email,
+			folder: folderCandidate,
+		});
+	};
+
+	const handleAssistantQuery = async (prompt: string) => {
+		const question = prompt.trim();
+		if (!question) return;
+
+		if (assistantStatus === 'thinking') {
+			console.log('🤖 Assistant is still responding. Please wait.');
+			return;
+		}
+
+		const userMessage = createAssistantMessage('user', question);
+		setAssistantMessages(prev => [...prev, userMessage]);
+		setAssistantError(null);
+
+		if (!assistantService.isEnabled()) {
+			const warning = createAssistantMessage(
+				'assistant',
+				'Set OPENAI_API_KEY in your .env file to enable the assistant.',
+			);
+			setAssistantMessages(prev => [...prev, warning]);
+			setAssistantStatus('error');
+			setAssistantError('OPENAI_API_KEY is not configured.');
+			return;
+		}
+
+		setAssistantStatus('thinking');
+
+		try {
+			const context = await gatherAssistantContext();
+			const history = [...assistantMessages, userMessage];
+			const response = await assistantService.createResponse({
+				prompt: question,
+				history,
+				context,
+			});
+			const assistantMessage = createAssistantMessage('assistant', response.reply);
+			setAssistantMessages(prev => [...prev, assistantMessage]);
+			setAssistantStatus('idle');
+			setAssistantError(null);
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: 'Unable to retrieve a response from the assistant.';
+			debugLog('App.tsx', 'Assistant query failed', {
+				error: error instanceof Error ? error.message : String(error),
+			});
+			const fallback = createAssistantMessage('assistant', `⚠️ ${message}`);
+			setAssistantMessages(prev => [...prev, fallback]);
+			setAssistantStatus('error');
+			setAssistantError(message);
+		}
+	};
 
 	// Handle navigation between components
 	useInput((input, key) => {
@@ -691,8 +828,19 @@ const App = () => {
 	};
 
 	const handleCommand = async (command: string) => {
-		const cmd = command.toLowerCase().trim();
-		debugLog('App.tsx handleCommand', 'Processing command', {command, cmd});
+		const trimmedCommand = command.trim();
+		if (!trimmedCommand) return;
+
+		if (!trimmedCommand.startsWith('/')) {
+			await handleAssistantQuery(trimmedCommand);
+			return;
+		}
+
+		const cmd = trimmedCommand.toLowerCase();
+		debugLog('App.tsx handleCommand', 'Processing command', {
+			command: trimmedCommand,
+			cmd,
+		});
 
 		switch (cmd) {
 			case '/quit':
@@ -716,12 +864,11 @@ const App = () => {
 			case '/settings':
 				setViewMode('settings');
 				break;
-			case '/setpage':
-				// Quick command to set messages per page
-				const args = command.split(' ');
+			case '/setpage': {
+				const args = trimmedCommand.split(' ');
 				if (args.length > 1 && args[1]) {
-					const num = parseInt(args[1]);
-					if (!isNaN(num) && num > 0 && num <= 100) {
+					const num = parseInt(args[1], 10);
+					if (!Number.isNaN(num) && num > 0 && num <= 100) {
 						settingsService.setMessagesPerPage(num);
 						console.log(
 							`Messages per page set to ${num}. Restart to apply changes.`,
@@ -736,6 +883,7 @@ const App = () => {
 					console.log('Usage: /setpage <number> to change');
 				}
 				break;
+			}
 			case '/refresh':
 			case '/sync':
 			case '/r':
@@ -757,12 +905,17 @@ const App = () => {
 				handleAutoRefreshToggle();
 				break;
 			case '/auto-refresh-interval':
-				handleAutoRefreshInterval(command);
+				handleAutoRefreshInterval(trimmedCommand);
+				break;
+			case '/assistant-clear':
+				setAssistantMessages([]);
+				setAssistantStatus('idle');
+				setAssistantError(null);
+				console.log('🤖 Assistant conversation reset');
 				break;
 			case '/download-path':
-			case '/set-download-path':
-				// Set custom download path
-				const pathArgs = command.split(' ').slice(1);
+			case '/set-download-path': {
+				const pathArgs = trimmedCommand.split(' ').slice(1);
 				if (pathArgs.length > 0) {
 					const newPath = pathArgs.join(' ');
 					await downloadService.setDownloadPath(newPath);
@@ -774,12 +927,12 @@ const App = () => {
 					console.log('Usage: /download-path <path>');
 				}
 				break;
-			case '/download':
-				// Download specific attachment (when in email view)
+			}
+			case '/download': {
 				if (viewMode === 'email' && openedEmail) {
-					const downloadArgs = command.split(' ').slice(1);
+					const downloadArgs = trimmedCommand.split(' ').slice(1);
 					if (downloadArgs.length > 0 && openedEmail.attachments) {
-						const attachmentIndex = parseInt(downloadArgs[0] || '0') - 1;
+						const attachmentIndex = parseInt(downloadArgs[0] || '0', 10) - 1;
 						if (
 							attachmentIndex >= 0 &&
 							attachmentIndex < openedEmail.attachments.length
@@ -797,7 +950,7 @@ const App = () => {
 									console.log(`❌ Failed to download: ${result.error}`);
 								}
 							}
-						} else {
+							} else {
 							console.log('❌ Invalid attachment number');
 						}
 					} else {
@@ -809,8 +962,8 @@ const App = () => {
 					);
 				}
 				break;
-			case '/download-all':
-				// Download all attachments (when in email view)
+			}
+			case '/download-all': {
 				if (viewMode === 'email' && openedEmail && openedEmail.attachments) {
 					const results = await downloadService.downloadMultipleAttachments(
 						openedEmail.attachments,
@@ -820,9 +973,7 @@ const App = () => {
 
 					if (successful.length > 0) {
 						console.log(
-							`✅ Downloaded ${
-								successful.length
-							} file(s) to ${downloadService.getDownloadPath()}`,
+							`✅ Downloaded ${successful.length} file(s) to ${downloadService.getDownloadPath()}`,
 						);
 					}
 					if (failed.length > 0) {
@@ -834,6 +985,7 @@ const App = () => {
 					);
 				}
 				break;
+			}
 			case '/search':
 				console.log('Search functionality not yet implemented');
 				break;
@@ -848,20 +1000,19 @@ const App = () => {
 				console.log('/refresh-all - Refresh all folders');
 				console.log('/refresh-inbox - Refresh inbox only');
 				console.log('/auto-refresh - Toggle auto-refresh on/off');
-				console.log(
-					'/auto-refresh-interval <n> - Set refresh interval (minutes)',
-				);
+				console.log('/auto-refresh-interval <n> - Set refresh interval (minutes)');
 				console.log('/cache-status - Show cache statistics');
 				console.log('/cache-clear - Clear all cached data');
 				console.log('/download <n> - Download attachment n (in email view)');
 				console.log('/download-all - Download all attachments (in email view)');
 				console.log('/download-path <path> - Set download directory');
+				console.log('/assistant-clear - Reset assistant conversation');
 				console.log('/search - Search emails');
 				console.log('/help - Show this help');
 				console.log('/quit - Exit the application');
 				break;
 			default:
-				console.log(`Unknown command: ${command}`);
+				console.log(`Unknown command: ${trimmedCommand}`);
 		}
 	};
 
@@ -910,6 +1061,9 @@ const App = () => {
 					onCommandInputDeactivate={() => setCommandInputActive(false)}
 					onCommand={handleCommand}
 					downloadService={downloadService}
+					assistantMessages={assistantMessages}
+					assistantStatus={assistantStatus}
+					assistantError={assistantError}
 				/>
 			) : null;
 
@@ -923,6 +1077,9 @@ const App = () => {
 					commandInputActive={commandInputActive}
 					onCommandInputDeactivate={() => setCommandInputActive(false)}
 					onCommand={handleCommand}
+					assistantMessages={assistantMessages}
+					assistantStatus={assistantStatus}
+					assistantError={assistantError}
 				/>
 			) : null;
 
@@ -1002,7 +1159,13 @@ const App = () => {
 							/>
 						</Box>
 					</Box>
-					<CommandInput
+					<AssistantPanel
+					messages={assistantMessages}
+					status={assistantStatus}
+					error={assistantError}
+				/>
+
+				<CommandInput
 						isActive={commandInputActive}
 						onDeactivate={() => setCommandInputActive(false)}
 						onCommand={handleCommand}

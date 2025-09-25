@@ -2,8 +2,10 @@ import React, {useState, useMemo, useEffect} from 'react';
 import {Box, Text, useInput, useStdout} from 'ink';
 import CommandBar from './CommandBar.js';
 import CommandInput from './CommandInput.js';
+import AssistantPanel from './AssistantPanel.js';
 import {EmailService} from '../services/emailService.js';
 import {EmailAccount, EmailMessage} from '../types/email.js';
+import {AssistantMessage, AssistantStatus} from '../types/assistant.js';
 
 interface Message {
 	id: string;
@@ -38,6 +40,9 @@ interface ThreadViewerProps {
 	commandInputActive: boolean;
 	onCommandInputDeactivate: () => void;
 	onCommand: (command: string) => void;
+	assistantMessages: AssistantMessage[];
+	assistantStatus: AssistantStatus;
+	assistantError?: string | null;
 }
 
 // Helper to extract email body content
@@ -221,6 +226,9 @@ const ThreadViewer: React.FC<ThreadViewerProps> = ({
 	commandInputActive,
 	onCommandInputDeactivate,
 	onCommand,
+	assistantMessages,
+	assistantStatus,
+	assistantError,
 }) => {
 	const [currentPage, setCurrentPage] = useState(0);
 	const [loading, setLoading] = useState(true);
@@ -547,6 +555,11 @@ const ThreadViewer: React.FC<ThreadViewerProps> = ({
 
 			{/* Footer */}
 			{/* Command Input */}
+			<AssistantPanel
+				messages={assistantMessages}
+				status={assistantStatus}
+				error={assistantError}
+			/>
 			<CommandInput
 				isActive={commandInputActive}
 				onDeactivate={onCommandInputDeactivate}

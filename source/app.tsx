@@ -14,6 +14,7 @@ import {SettingsDialog} from './components/SettingsDialog.js';
 import {EmailService} from './services/emailService.js';
 import {SettingsService} from './services/settingsService.js';
 import {CacheService} from './services/cacheService.js';
+import {DownloadService} from './services/downloadService.js';
 import {EmailAccount, EmailMessage} from './types/email.js';
 import {RefreshStatus} from './types/refresh.js';
 import fs from 'fs';
@@ -57,6 +58,13 @@ interface Message {
 		text?: string;
 		html?: string;
 	};
+	attachments?: Array<{
+		filename: string;
+		contentType: string;
+		size: number;
+		contentId?: string;
+		content?: Buffer;
+	}>;
 	_original?: any; // Original EmailMessage data
 }
 
@@ -79,6 +87,7 @@ const App = () => {
 	const [emailService] = useState(() => new EmailService());
 	const [settingsService] = useState(() => new SettingsService());
 	const [cacheService] = useState(() => new CacheService());
+	const [downloadService] = useState(() => new DownloadService());
 	const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([]);
 	const [refreshStatus, setRefreshStatus] = useState<RefreshStatus>({
 		isRefreshing: false,
@@ -750,6 +759,81 @@ const App = () => {
 			case '/auto-refresh-interval':
 				handleAutoRefreshInterval(command);
 				break;
+			case '/download-path':
+			case '/set-download-path':
+				// Set custom download path
+				const pathArgs = command.split(' ').slice(1);
+				if (pathArgs.length > 0) {
+					const newPath = pathArgs.join(' ');
+					await downloadService.setDownloadPath(newPath);
+					console.log(`✅ Download path set to: ${newPath}`);
+				} else {
+					console.log(
+						`Current download path: ${downloadService.getDownloadPath()}`,
+					);
+					console.log('Usage: /download-path <path>');
+				}
+				break;
+			case '/download':
+				// Download specific attachment (when in email view)
+				if (viewMode === 'email' && openedEmail) {
+					const downloadArgs = command.split(' ').slice(1);
+					if (downloadArgs.length > 0 && openedEmail.attachments) {
+						const attachmentIndex = parseInt(downloadArgs[0] || '0') - 1;
+						if (
+							attachmentIndex >= 0 &&
+							attachmentIndex < openedEmail.attachments.length
+						) {
+							const attachment = openedEmail.attachments[attachmentIndex];
+							if (attachment) {
+								const result = await downloadService.downloadAttachment(
+									attachment,
+								);
+								if (result.success) {
+									console.log(
+										`✅ Downloaded ${attachment.filename} to ${result.filePath}`,
+									);
+								} else {
+									console.log(`❌ Failed to download: ${result.error}`);
+								}
+							}
+						} else {
+							console.log('❌ Invalid attachment number');
+						}
+					} else {
+						console.log('Usage: /download <number>');
+					}
+				} else {
+					console.log(
+						'ℹ️ This command only works when viewing an email with attachments',
+					);
+				}
+				break;
+			case '/download-all':
+				// Download all attachments (when in email view)
+				if (viewMode === 'email' && openedEmail && openedEmail.attachments) {
+					const results = await downloadService.downloadMultipleAttachments(
+						openedEmail.attachments,
+					);
+					const successful = results.filter(r => r.success);
+					const failed = results.filter(r => !r.success);
+
+					if (successful.length > 0) {
+						console.log(
+							`✅ Downloaded ${
+								successful.length
+							} file(s) to ${downloadService.getDownloadPath()}`,
+						);
+					}
+					if (failed.length > 0) {
+						console.log(`⚠️ Failed to download ${failed.length} file(s)`);
+					}
+				} else {
+					console.log(
+						'ℹ️ This command only works when viewing an email with attachments',
+					);
+				}
+				break;
 			case '/search':
 				console.log('Search functionality not yet implemented');
 				break;
@@ -769,6 +853,9 @@ const App = () => {
 				);
 				console.log('/cache-status - Show cache statistics');
 				console.log('/cache-clear - Clear all cached data');
+				console.log('/download <n> - Download attachment n (in email view)');
+				console.log('/download-all - Download all attachments (in email view)');
+				console.log('/download-path <path> - Set download directory');
 				console.log('/search - Search emails');
 				console.log('/help - Show this help');
 				console.log('/quit - Exit the application');
@@ -822,6 +909,7 @@ const App = () => {
 					commandInputActive={commandInputActive}
 					onCommandInputDeactivate={() => setCommandInputActive(false)}
 					onCommand={handleCommand}
+					downloadService={downloadService}
 				/>
 			) : null;
 

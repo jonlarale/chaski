@@ -53,7 +53,7 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({
 		>
 			<Box justifyContent="space-between" width="100%">
 				<Text color={colors.cyan} bold>
-					🤖 Mail Assistant
+					🤖 Chaski AI Assistant
 				</Text>
 				<Text color={statusColor}>{statusText}</Text>
 			</Box>
@@ -67,7 +67,11 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({
 					recentMessages.map(message => {
 						const role = roleLabel[message.role];
 						return (
-							<Box key={message.id} flexDirection="column" marginBottom={spacing.marginXS}>
+							<Box
+								key={message.id}
+								flexDirection="column"
+								marginBottom={spacing.marginXS}
+							>
 								<Text color={role.color} bold>
 									{role.prefix}
 								</Text>

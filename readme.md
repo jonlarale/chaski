@@ -296,10 +296,18 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## Sponsoring
+
+If you find this project useful, consider supporting its development:
+
+<a href="https://www.buymeacoffee.com/jonlarale">
+  <img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me A Coffee">
+</a>
+
 ## Author
 
-**Jonathan Larraguivel Alemán**  
-Email: jonlarale@gmail.com  
+**Jonathan Larraguivel Alemán**
+Email: jonlarale@gmail.com
 GitHub: [@jonlarale](https://github.com/jonlarale)
 
 ## Acknowledgments

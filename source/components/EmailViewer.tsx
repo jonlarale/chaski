@@ -3,6 +3,7 @@ import {Box, Text, useInput, useStdout} from 'ink';
 import CommandBar from './CommandBar.js';
 import CommandInput from './CommandInput.js';
 import {colors, semanticColors, spacing} from '../constants/index.js';
+import {DownloadService} from '../services/downloadService.js';
 
 interface Message {
 	id: string;
@@ -15,6 +16,13 @@ interface Message {
 		text?: string;
 		html?: string;
 	};
+	attachments?: Array<{
+		filename: string;
+		contentType: string;
+		size: number;
+		contentId?: string;
+		content?: Buffer;
+	}>;
 }
 
 interface EmailViewerProps {
@@ -25,6 +33,7 @@ interface EmailViewerProps {
 	commandInputActive: boolean;
 	onCommandInputDeactivate: () => void;
 	onCommand: (command: string) => void;
+	downloadService?: DownloadService;
 }
 
 const EmailViewer: React.FC<EmailViewerProps> = ({
@@ -35,9 +44,12 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 	commandInputActive,
 	onCommandInputDeactivate,
 	onCommand,
+	downloadService,
 }) => {
 	const [scrollPosition, setScrollPosition] = useState(0);
 	const [scrollVelocity, setScrollVelocity] = useState(1);
+	const [downloadStatus, setDownloadStatus] = useState<string>('');
+	const [waitingForDownloadInput, setWaitingForDownloadInput] = useState(false);
 	const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const {write, stdout} = useStdout();
 
@@ -148,7 +160,7 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 		}, 200);
 	};
 
-	useInput((input, key) => {
+	useInput(async (input, key) => {
 		// If command input is active, don't handle navigation keys
 		if (commandInputActive) return;
 
@@ -189,6 +201,79 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 			// G to go to bottom (vim style)
 			setScrollPosition(maxScrollPosition);
 			setScrollVelocity(1);
+		} else if (input === 'd' || input === 'D') {
+			// 'd' to start download mode
+			if (message.attachments && message.attachments.length > 0) {
+				if (input === 'D') {
+					// Download all attachments
+					if (downloadService) {
+						const results = await downloadService.downloadMultipleAttachments(
+							message.attachments,
+						);
+						const successful = results.filter(r => r.success);
+						const failed = results.filter(r => !r.success);
+
+						if (successful.length > 0) {
+							setDownloadStatus(
+								`✅ Downloaded ${
+									successful.length
+								} file(s) to ${downloadService.getDownloadPath()}`,
+							);
+						}
+						if (failed.length > 0) {
+							setDownloadStatus(
+								`⚠️ Failed to download ${failed.length} file(s)`,
+							);
+						}
+
+						// Clear status after 3 seconds
+						setTimeout(() => setDownloadStatus(''), 3000);
+					}
+				} else {
+					// Wait for number input
+					setWaitingForDownloadInput(true);
+					setDownloadStatus(
+						'📥 Enter attachment number to download (1-' +
+							message.attachments.length +
+							')',
+					);
+				}
+			}
+		} else if (waitingForDownloadInput && /^[0-9]$/.test(input)) {
+			// Handle attachment number input
+			const attachmentIndex = parseInt(input, 10) - 1;
+			if (
+				message.attachments &&
+				attachmentIndex >= 0 &&
+				attachmentIndex < message.attachments.length
+			) {
+				const attachment = message.attachments[attachmentIndex];
+
+				if (downloadService && attachment) {
+					const result = await downloadService.downloadAttachment(attachment);
+					if (result.success) {
+						setDownloadStatus(
+							`✅ Downloaded ${attachment.filename} to ${result.filePath}`,
+						);
+					} else {
+						setDownloadStatus(`❌ Failed to download: ${result.error}`);
+					}
+				} else {
+					setDownloadStatus('❌ Download service not available');
+				}
+
+				// Clear status after 3 seconds
+				setTimeout(() => setDownloadStatus(''), 3000);
+			} else {
+				setDownloadStatus('❌ Invalid attachment number');
+				setTimeout(() => setDownloadStatus(''), 2000);
+			}
+
+			setWaitingForDownloadInput(false);
+		} else if (waitingForDownloadInput && (key.escape || key.return)) {
+			// Cancel download mode
+			setWaitingForDownloadInput(false);
+			setDownloadStatus('');
 		}
 	});
 
@@ -283,6 +368,54 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 							{line || ' '}
 						</Text>
 					))}
+
+					{/* Attachments Section */}
+					{message.attachments && message.attachments.length > 0 && (
+						<Box
+							flexDirection="column"
+							marginTop={2}
+							borderStyle="round"
+							borderColor="gray"
+							padding={1}
+						>
+							<Text bold color="yellow">
+								📎 Attachments ({message.attachments.length})
+							</Text>
+							{message.attachments.map((attachment, index) => (
+								<Box key={index} marginTop={1}>
+									<Text color="cyan">
+										{index + 1}. {attachment.filename}
+									</Text>
+									<Text color="gray" dimColor>
+										{DownloadService.formatFileSize(attachment.size)} •{' '}
+										{attachment.contentType}
+									</Text>
+								</Box>
+							))}
+							<Box marginTop={1}>
+								<Text color="gray" italic>
+									Press 'd' + number to download • 'D' to download all
+								</Text>
+							</Box>
+						</Box>
+					)}
+
+					{/* Download Status */}
+					{downloadStatus && (
+						<Box marginTop={1}>
+							<Text
+								color={
+									downloadStatus.startsWith('✅')
+										? 'green'
+										: downloadStatus.startsWith('❌')
+										? 'red'
+										: 'yellow'
+								}
+							>
+								{downloadStatus}
+							</Text>
+						</Box>
+					)}
 				</Box>
 
 				{/* Scroll indicator inferior */}
@@ -322,6 +455,9 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 					{key: 'Shift+↑↓', label: 'Jump', action: 'select'},
 					{key: 'R', label: 'Reply', action: 'primary'},
 					{key: 'F', label: 'Forward', action: 'secondary'},
+					...(message.attachments && message.attachments.length > 0
+						? [{key: 'd/D', label: 'Download', action: 'secondary' as const}]
+						: []),
 					{key: 'ESC', label: 'Back', action: 'back'},
 				]}
 			/>

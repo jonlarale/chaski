@@ -343,9 +343,10 @@ Original error: ${err.message}`),
 		);
 
 		const fetch = this.imap!.seq.fetch(fetchRange, {
-			bodies: '',
-			struct: true,
+			bodies: '',  // Gets the full message including attachments
+			struct: true,  // Gets the MIME structure
 			envelope: true,
+			markSeen: false,  // Don't mark as read when fetching
 		});
 
 		fetch.on('message', msg => {
@@ -434,9 +435,10 @@ Original error: ${err.message}`),
 				let message: EmailMessage | null = null;
 
 				const fetch = this.imap!.fetch(uid, {
-					bodies: '',
-					struct: true,
+					bodies: '',  // Gets the full message including attachments
+					struct: true,  // Gets the MIME structure
 					envelope: true,
+					markSeen: false,  // Don't mark as read when fetching
 				});
 
 				fetch.on('message', msg => {
@@ -653,9 +655,10 @@ Original error: ${err.message}`),
 					// Fetch all the messages
 					const messages: EmailMessage[] = [];
 					const fetch = this.imap!.seq.fetch(results, {
-						bodies: '',
-						struct: true,
+						bodies: '',  // Gets the full message including attachments
+						struct: true,  // Gets the MIME structure
 						envelope: true,
+						markSeen: false,  // Don't mark as read when fetching
 					});
 
 					fetch.on('message', msg => {
@@ -786,6 +789,20 @@ Original error: ${err.message}`),
 	): EmailMessage {
 		// Ensure attributes is an object
 		const attrs = attributes || {};
+
+		// Debug log for attachments
+		if (parsed.attachments && parsed.attachments.length > 0) {
+			debugLog(
+				LogLevel.INFO,
+				'ImapService',
+				`Message UID ${uid} has ${parsed.attachments.length} attachments:`,
+				parsed.attachments.map((att: any) => ({
+					filename: att.filename,
+					contentType: att.contentType,
+					size: att.size,
+				})),
+			);
+		}
 
 		return {
 			id: parsed.messageId || `${uid}`,

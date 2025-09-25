@@ -20,6 +20,13 @@ interface Message {
 		text?: string;
 		html?: string;
 	};
+	attachments?: Array<{
+		filename: string;
+		contentType: string;
+		size: number;
+		contentId?: string;
+		content?: Buffer;
+	}>;
 	// Store original EmailMessage for conversion back
 	_original?: EmailMessage;
 }
@@ -97,6 +104,7 @@ const convertEmailMessage = (email: EmailMessage): Message => {
 		preview,
 		threadCount,
 		body: email.body,
+		attachments: email.attachments,
 		_original: email,
 	};
 };
@@ -954,6 +962,21 @@ const MessageList: React.FC<MessageListProps> = ({
 											}
 										>
 											{message.from} - {message.date}
+											{message.attachments &&
+												message.attachments.length > 0 && (
+													<Text
+														color={
+															isSelected
+																? colors.white
+																: semanticColors.message.threadIndicator
+														}
+													>
+														{' '}
+														📎
+														{message.attachments.length > 1 &&
+															` ${message.attachments.length}`}
+													</Text>
+												)}
 											{message.threadCount && message.threadCount > 0 && (
 												<Text
 													color={

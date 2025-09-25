@@ -236,13 +236,13 @@ const App = () => {
 		// If the message has the original email data, mark it as read in the email service
 		if (message._original && selectedAccount) {
 			const account = emailAccounts.find(acc => acc.email === selectedAccount);
-			if (account && message._original.id) {
+			if (account && message._original.uid) {
 				try {
 					// Mark as read in the email service (this will update IMAP)
 					await emailService.markAsRead(
 						account.id,
 						selectedFolder,
-						message._original.id,
+						message._original.uid,
 					);
 
 					// Update the cache to reflect the read status

@@ -21,6 +21,13 @@ interface CachedMessage {
 	last_fetched: number;
 }
 
+interface CachedAttachment {
+	filename: string;
+	content_type: string;
+	size: number;
+	content_id: string | null;
+}
+
 // interface CachedFolder {
 // 	id: string;
 // 	account_id: string;
@@ -135,6 +142,23 @@ export class CacheService {
 			);
 		`);
 
+		// Attachments table to store attachment details
+		this.db.exec(`
+			CREATE TABLE IF NOT EXISTS attachments (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				message_uid INTEGER NOT NULL,
+				folder_id TEXT NOT NULL,
+				account_id TEXT NOT NULL,
+				filename TEXT NOT NULL,
+				content_type TEXT,
+				size INTEGER,
+				content_id TEXT,
+				FOREIGN KEY (message_uid, folder_id, account_id) REFERENCES messages(uid, folder_id, account_id) ON DELETE CASCADE
+			);
+
+			CREATE INDEX IF NOT EXISTS idx_attachments_message ON attachments(message_uid, folder_id, account_id);
+		`);
+
 		debugLog(LogLevel.INFO, 'CacheService', 'Database tables created/verified');
 	}
 
@@ -149,7 +173,7 @@ export class CacheService {
 
 		try {
 			const stmt = this.db.prepare(`
-				SELECT * FROM messages 
+				SELECT * FROM messages
 				WHERE folder_id = ? AND account_id = ?
 				ORDER BY date DESC
 				LIMIT ? OFFSET ?
@@ -161,7 +185,23 @@ export class CacheService {
 				limit,
 				offset,
 			) as CachedMessage[];
-			return rows.map(row => this.cachedMessageToEmailMessage(row));
+
+			// Get attachments for each message
+			const attachmentStmt = this.db.prepare(`
+				SELECT filename, content_type, size, content_id
+				FROM attachments
+				WHERE message_uid = ? AND folder_id = ? AND account_id = ?
+			`);
+
+			return rows.map(row => {
+				const attachments = attachmentStmt.all(
+					row.uid,
+					folderId,
+					accountId,
+				) as CachedAttachment[];
+
+				return this.cachedMessageToEmailMessage(row, attachments);
+			});
 		} catch (error) {
 			debugLog(
 				LogLevel.ERROR,
@@ -188,6 +228,18 @@ export class CacheService {
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`);
 
+		// Prepare statement for inserting attachments
+		const insertAttachmentStmt = this.db.prepare(`
+			INSERT OR REPLACE INTO attachments (
+				message_uid, folder_id, account_id, filename, content_type, size, content_id
+			) VALUES (?, ?, ?, ?, ?, ?, ?)
+		`);
+
+		// Delete existing attachments for these messages before inserting new ones
+		const deleteAttachmentsStmt = this.db.prepare(`
+			DELETE FROM attachments WHERE message_uid = ? AND folder_id = ? AND account_id = ?
+		`);
+
 		const transaction = this.db.transaction((messages: EmailMessage[]) => {
 			const now = Date.now();
 			for (const msg of messages) {
@@ -210,6 +262,24 @@ export class CacheService {
 					msg.references ? msg.references.length : 0,
 					now,
 				);
+
+				// First, delete existing attachments for this message
+				deleteAttachmentsStmt.run(msg.uid, folderId, accountId);
+
+				// Then insert new attachments if any
+				if (msg.attachments && msg.attachments.length > 0) {
+					for (const attachment of msg.attachments) {
+						insertAttachmentStmt.run(
+							msg.uid,
+							folderId,
+							accountId,
+							attachment.filename || 'unnamed',
+							attachment.contentType || 'application/octet-stream',
+							attachment.size || 0,
+							attachment.contentId || null,
+						);
+					}
+				}
 			}
 		});
 
@@ -375,7 +445,10 @@ export class CacheService {
 	}
 
 	// Convert cached message to EmailMessage format
-	private cachedMessageToEmailMessage(cached: CachedMessage): EmailMessage {
+	private cachedMessageToEmailMessage(
+		cached: CachedMessage,
+		attachments?: CachedAttachment[],
+	): EmailMessage {
 		return {
 			id: cached.uid.toString(),
 			accountId: cached.account_id,
@@ -396,7 +469,15 @@ export class CacheService {
 			body: {
 				text: cached.preview,
 			},
-			attachments: cached.has_attachments ? [] : undefined,
+			attachments:
+				attachments && attachments.length > 0
+					? attachments.map(att => ({
+							filename: att.filename,
+							contentType: att.content_type,
+							size: att.size,
+							contentId: att.content_id || undefined,
+					  }))
+					: undefined,
 			flags: cached.flags ? cached.flags.split(',') : [],
 			references: cached.thread_count > 0 ? [] : undefined,
 		};

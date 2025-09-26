@@ -9,6 +9,7 @@
 		/>
 		<title>Chaski – Terminal Email Client with AI Assistant</title>
 		<link rel="stylesheet" href="styles.css" />
+		<script src="script.js" defer></script>
 		<link rel="preload" href="assets/chaski.png" as="image" />
 		<link rel="preload" href="assets/home-view.png" as="image" />
 		<link rel="preload" href="assets/command-your-email.png" as="image" />
@@ -16,11 +17,20 @@
 	</head>
 	<body>
 		<header class="hero" id="top">
-			<nav class="nav">
+			<nav class="nav" data-nav>
 				<a class="brand" href="#top">
 					<img src="assets/chaski.png" alt="Chaski logo" />
 				</a>
-				<div class="nav-links">
+				<button
+					class="nav-toggle"
+					type="button"
+					aria-expanded="false"
+					aria-controls="primary-navigation"
+				>
+					<span class="sr-only">Toggle navigation</span>
+					<span aria-hidden="true"></span>
+				</button>
+				<div class="nav-links" id="primary-navigation">
 					<a href="#features">Features</a>
 					<a href="#screens">Screenshots</a>
 					<a href="#assistant">AI Assistant</a>
@@ -34,6 +44,7 @@
 					>
 				</div>
 			</nav>
+
 			<div class="hero-content">
 				<div class="hero-copy">
 					<p class="eyebrow">Terminal-first email for developers</p>

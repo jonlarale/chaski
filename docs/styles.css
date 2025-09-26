@@ -102,6 +102,80 @@ a:focus {
 	color: var(--text);
 }
 
+.nav-toggle {
+	display: none;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+	padding: 10px 16px;
+	border-radius: 999px;
+	border: 1px solid var(--border);
+	background: rgba(5, 6, 15, 0.6);
+	color: var(--text);
+	font-weight: 600;
+	cursor: pointer;
+	transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.nav-toggle:hover,
+.nav-toggle:focus {
+	background: rgba(102, 217, 239, 0.15);
+	border-color: rgba(102, 217, 239, 0.45);
+}
+
+.nav-toggle span[aria-hidden='true'] {
+	position: relative;
+	display: block;
+	width: 20px;
+	height: 2px;
+	background: currentColor;
+}
+
+.nav-toggle span[aria-hidden='true']::before,
+.nav-toggle span[aria-hidden='true']::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	width: 20px;
+	height: 2px;
+	background: currentColor;
+	transition: transform 0.2s ease, top 0.2s ease, opacity 0.2s ease;
+}
+
+.nav-toggle span[aria-hidden='true']::before {
+	top: -6px;
+}
+
+.nav-toggle span[aria-hidden='true']::after {
+	top: 6px;
+}
+
+.nav.nav-open .nav-toggle span[aria-hidden='true'] {
+	background: transparent;
+}
+
+.nav.nav-open .nav-toggle span[aria-hidden='true']::before {
+	top: 0;
+	transform: rotate(45deg);
+}
+
+.nav.nav-open .nav-toggle span[aria-hidden='true']::after {
+	top: 0;
+	transform: rotate(-45deg);
+}
+
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
 .hero-content {
 	display: grid;
 	grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
@@ -474,29 +548,220 @@ main {
 	.nav {
 		flex-direction: column;
 		gap: 16px;
+		align-items: flex-start;
+		width: 100%;
+	}
+
+	.brand img {
+		width: 72px;
+		height: 72px;
+	}
+
+	.nav-toggle {
+		display: flex;
+		align-self: flex-end;
+		margin-left: auto;
 	}
 
 	.nav-links {
-		flex-wrap: wrap;
+		display: none;
+		flex-direction: column;
+		align-items: center;
+		width: 100%;
+		padding-top: 18px;
+		gap: 18px;
+		border-top: 1px solid var(--border);
+		font-size: 0.9rem;
+	}
+
+	.nav-links a {
+		width: 100%;
+		text-align: center;
+		padding: 6px 0;
+	}
+
+	.nav.nav-open .nav-links {
+		display: flex;
+	}
+
+	.hero {
+		padding: 32px 18px 56px;
+	}
+
+	.hero-content {
+		text-align: center;
+		gap: 28px;
+	}
+
+	.hero-card {
+		margin: 0 auto;
+		max-width: 460px;
+	}
+
+	.hero-actions {
+		width: 100%;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 12px;
+	}
+
+	.hero-actions .primary,
+	.hero-actions .secondary {
+		width: 100%;
 		justify-content: center;
 	}
 
+	.hero-copy .lead {
+		font-size: 1rem;
+	}
+
 	main {
-		padding: 64px 18px;
-		gap: 64px;
+		padding: 56px 16px;
+		gap: 56px;
+	}
+
+	.highlight {
+		padding: 36px 24px;
+	}
+
+	.split {
+		gap: 24px;
+	}
+
+	.secondary {
+		padding: 56px 32px;
+	}
+
+	.footer {
+		flex-direction: column;
+		text-align: center;
+		gap: 16px;
+	}
+
+	.footer-links {
+		flex-wrap: wrap;
+		justify-content: center;
 	}
 
 	.gallery {
 		grid-template-columns: 1fr;
 	}
-
-	.hero {
-		padding: 32px 18px 64px;
-	}
 }
 
 @media (max-width: 520px) {
+	.brand {
+		margin-left: auto;
+		margin-right: auto;
+	}
+	.brand img {
+		width: 58px;
+		height: 58px;
+	}
+
+	.nav-toggle {
+		padding: 16px 14px;
+	}
+
+	.nav-links {
+		padding-top: 16px;
+		gap: 16px;
+	}
+
+	.nav-links a {
+		padding: 4px 0;
+	}
+
+	.hero {
+		padding: 28px 16px 52px;
+	}
+
+	.hero-card {
+		padding: 20px;
+	}
+
+	.hero-actions {
+		gap: 10px;
+	}
+
+	.feature,
+	.card,
+	.steps article {
+		padding: 20px;
+	}
+
+	.feature-grid {
+		gap: 18px;
+	}
+
+	.highlight {
+		padding: 28px 20px;
+	}
+
+	.gallery {
+		gap: 22px;
+	}
+
+	.gallery figcaption {
+		padding: 18px 20px;
+	}
+
+	.secondary {
+		padding: 48px 24px;
+	}
+
 	.download {
 		flex-direction: column;
+		width: 100%;
+	}
+
+	.download code {
+		width: 100%;
+		text-align: center;
+	}
+
+	.footer-links {
+		gap: 12px;
+	}
+}
+
+@media (max-width: 420px) {
+	.nav-toggle {
+		width: 100%;
+		justify-content: center;
+	}
+
+	.nav-links {
+		gap: 10px;
+		font-size: 0.85rem;
+	}
+
+	.nav-links a {
+		flex: 1 1 100%;
+		text-align: center;
+	}
+
+	.hero-copy h1 {
+		font-size: 2.2rem;
+	}
+
+	.hero-copy .lead {
+		font-size: 0.95rem;
+	}
+
+	.hero-card {
+		padding: 18px;
+	}
+
+	main {
+		padding: 44px 14px;
+		gap: 44px;
+	}
+
+	.steps article {
+		padding: 18px;
+	}
+
+	.footer {
+		padding: 28px 18px 40px;
 	}
 }

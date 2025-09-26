@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta
+			name="description"
+			content="Chaski is a terminal-first email client with an integrated AI assistant, built for developers who want to triage and compose email without leaving the command line."
+		/>
+		<title>Chaski – Terminal Email Client with AI Assistant</title>
+		<link rel="stylesheet" href="styles.css" />
+		<script src="script.js" defer></script>
+		<link rel="preload" href="assets/chaski.png" as="image" />
+		<link rel="preload" href="assets/home-view.png" as="image" />
+		<link rel="preload" href="assets/command-your-email.png" as="image" />
+		<link rel="preload" href="assets/ai-assistant.png" as="image" />
+	</head>
+	<body>
+		<header class="hero" id="top">
+			<nav class="nav" data-nav>
+				<a class="brand" href="#top">
+					<img src="assets/chaski.png" alt="Chaski logo" />
+				</a>
+				<button
+					class="nav-toggle"
+					type="button"
+					aria-expanded="false"
+					aria-controls="primary-navigation"
+				>
+					<span class="sr-only">Toggle navigation</span>
+					<span aria-hidden="true"></span>
+				</button>
+				<div class="nav-links" id="primary-navigation">
+					<a href="#features">Features</a>
+					<a href="#screens">Screenshots</a>
+					<a href="#assistant">AI Assistant</a>
+					<a href="#workflow">Workflow</a>
+					<a href="#open-source">Open Source</a>
+					<a
+						href="https://github.com/jonlarale/chaski"
+						target="_blank"
+						rel="noopener noreferrer"
+						>GitHub</a
+					>
+				</div>
+			</nav>
+
+			<div class="hero-content">
+				<div class="hero-copy">
+					<p class="eyebrow">Terminal-first email for developers</p>
+					<h1>Stay in your flow while staying on top of your inbox.</h1>
+					<p class="lead">
+						Chaski is an open source terminal client for reading, composing, and
+						summarising email. It speaks the language of your IDE—command
+						palettes, keyboard driven navigation, and an AI teammate powered by
+						the inbox you already synched locally.
+					</p>
+					<div class="hero-actions">
+						<a
+							class="primary"
+							href="https://github.com/jonlarale/chaski"
+							target="_blank"
+							rel="noopener noreferrer"
+							>View on GitHub</a
+						>
+						<a
+							class="secondary"
+							href="https://github.com/jonlarale/chaski#quick-start"
+							target="_blank"
+							rel="noopener noreferrer"
+							>Read the docs</a
+						>
+					</div>
+				</div>
+				<aside class="hero-card">
+					<h2>Why builders choose Chaski</h2>
+					<ul>
+						<li>Compose and triage email without ever leaving the terminal.</li>
+						<li>
+							Summarise threads instantly with the integrated ChatGPT assistant.
+						</li>
+						<li>Manage unlimited inboxes with secure local storage.</li>
+						<li>
+							Drive everything from a command palette or Vim-style shortcuts.
+						</li>
+					</ul>
+				</aside>
+			</div>
+		</header>
+
+		<main>
+			<section class="section" id="features">
+				<h2>Features built for your command line workflow</h2>
+				<div class="feature-grid">
+					<article class="feature">
+						<h3>Universal inbox</h3>
+						<p>
+							Connect Gmail, Outlook, or any IMAP/SMTP provider. Switch between
+							as many accounts as you need—Chaski keeps each mailbox synced and
+							cached locally.
+						</p>
+					</article>
+					<article class="feature">
+						<h3>Fast keyboard navigation</h3>
+						<p>
+							Navigate with familiar Vim-style keys or arrow keys. Jump between
+							folders, open messages, and act on threads without touching the
+							mouse.
+						</p>
+					</article>
+					<article class="feature">
+						<h3>Configurable everything</h3>
+						<p>
+							Decide how many messages render per page, customise pagination
+							commands, and fine tune auto-refresh intervals to match your flow.
+						</p>
+					</article>
+					<article class="feature">
+						<h3>Local-first security</h3>
+						<p>
+							Credentials never leave your machine. They live encrypted in
+							<code>~/.chaski</code> alongside cache data guarded by strict file
+							permissions.
+						</p>
+					</article>
+					<article class="feature">
+						<h3>Command palette actions</h3>
+						<p>
+							Everything is a command. Add accounts, purge cache, toggle
+							auto-refresh, or ask for help straight from the palette—complete
+							with tab-completion muscle memory.
+						</p>
+					</article>
+					<article class="feature">
+						<h3>Extensible architecture</h3>
+						<p>
+							React (Ink) + TypeScript keep the codebase friendly to
+							contributions. Services, components, and utilities live where you
+							expect them.
+						</p>
+					</article>
+				</div>
+			</section>
+
+			<section class="section visuals" id="screens">
+				<h2>See Chaski in action</h2>
+				<p class="visuals-lead">
+					Real screenshots from the terminal client showcase the home dashboard,
+					command palette, and AI assistant flow.
+				</p>
+				<div class="gallery">
+					<figure>
+						<img
+							src="assets/home-view.png"
+							alt="Home view overview displaying inbox metrics and recent activity"
+							loading="lazy"
+						/>
+						<figcaption>
+							<h3>Home View</h3>
+							<p>
+								Monitor every inbox at once, with unread counts and quick access
+								to folders tailored to your workflow.
+							</p>
+						</figcaption>
+					</figure>
+					<figure>
+						<img
+							src="assets/command-your-email.png"
+							alt="Command palette showing available email actions"
+							loading="lazy"
+						/>
+						<figcaption>
+							<h3>Command Your Email</h3>
+							<p>
+								Trigger actions from the palette—compose, refresh, paginate, and
+								more—without leaving the keyboard.
+							</p>
+						</figcaption>
+					</figure>
+					<figure>
+						<img
+							src="assets/ai-assistant.png"
+							alt="AI assistant summarising an email thread inside the terminal"
+							loading="lazy"
+						/>
+						<figcaption>
+							<h3>AI Assistant</h3>
+							<p>
+								Ask ChatGPT to summarise threads or craft replies using only the
+								messages already cached locally.
+							</p>
+						</figcaption>
+					</figure>
+				</div>
+			</section>
+
+			<section class="section highlight" id="assistant">
+				<div class="highlight-content">
+					<div>
+						<h2>Let the AI inbox assistant brief you</h2>
+						<p>
+							Chaski ships with a built-in ChatGPT assistant that knows the
+							context of the email already synced to your terminal. Ask
+							<em>“Summarise this thread”</em>,
+							<em>“What are the key action items?”</em>, or
+							<em>“Draft a reply”</em> without copying dense threads into the
+							browser.
+						</p>
+						<ul>
+							<li>
+								Powered by your OpenAI API key; no data leaves your machine
+								beyond the prompt you send.
+							</li>
+							<li>
+								Keep or reset the conversation with palette commands such as
+								<code>/assistant-clear</code>.
+							</li>
+							<li>
+								Inline history keeps you aware of request status and responses.
+							</li>
+						</ul>
+					</div>
+					<div class="cards">
+						<article class="card">
+							<h3>Bring your own key</h3>
+							<p>
+								Drop <code>OPENAI_API_KEY</code> in your environment and Chaski
+								handles authentication, rate limits, and context for you.
+							</p>
+						</article>
+						<article class="card">
+							<h3>Local context</h3>
+							<p>
+								Only the emails you already downloaded are used for
+								summarisation, keeping private threads private.
+							</p>
+						</article>
+					</div>
+				</div>
+			</section>
+
+			<section class="section" id="workflow">
+				<h2>From zero to inbox zen in minutes</h2>
+				<div class="steps">
+					<article>
+						<span class="step-number">1</span>
+						<h3>Install &amp; launch</h3>
+						<p>
+							Clone the repo, run <code>npm install</code>, then
+							<code>npm start</code> to boot the CLI. Chaski runs anywhere Node
+							16+ is available.
+						</p>
+					</article>
+					<article>
+						<span class="step-number">2</span>
+						<h3>Add your inboxes</h3>
+						<p>
+							Use the command palette (<code>/add-account</code>) to connect
+							Gmail, Outlook, or custom IMAP/SMTP accounts with secure local
+							storage.
+						</p>
+					</article>
+					<article>
+						<span class="step-number">3</span>
+						<h3>Command your email</h3>
+						<p>
+							Navigate with <code>j/k</code>, compose with <code>c</code>,
+							refresh with <code>/refresh</code>, and let the assistant
+							summarise long threads.
+						</p>
+					</article>
+				</div>
+				<p class="cta-note">
+					Prefer automation? Wire Chaski into scripts or call it from your
+					editor&apos;s built-in terminal.
+				</p>
+			</section>
+
+			<section class="section" id="open-source">
+				<div class="split">
+					<div>
+						<h2>Open source and ready for collaboration</h2>
+						<p>
+							Named after the Incan messengers who relayed vital news between
+							mountain villages, Chaski is built to carry your messages swiftly
+							and securely. The project welcomes contributors—whether you want
+							to add protocols, refine the UI, or extend the AI assistant.
+						</p>
+						<ul>
+							<li>MIT licensed and actively maintained.</li>
+							<li>TypeScript-first stack with strong linting and tests.</li>
+							<li>
+								Clear <code>CONTRIBUTING.md</code> guide and conventional
+								commits.
+							</li>
+						</ul>
+						<a
+							class="primary inline"
+							href="https://github.com/jonlarale/chaski#contributing"
+							target="_blank"
+							rel="noopener noreferrer"
+							>Contribute on GitHub</a
+						>
+					</div>
+					<aside class="info-card">
+						<h3>Tech stack</h3>
+						<ul>
+							<li>Ink (React for CLIs)</li>
+							<li>TypeScript + Node.js</li>
+							<li>SQLite caching layer</li>
+							<li>Secure credential vault</li>
+						</ul>
+					</aside>
+				</div>
+			</section>
+
+			<section class="section secondary">
+				<h2>Ready to run Chaski?</h2>
+				<p>
+					Install it locally, connect your inboxes, and keep your email in the
+					same window as your code.
+				</p>
+				<div class="download">
+					<code>git clone https://github.com/jonlarale/chaski.git</code>
+					<code>npm install</code>
+					<code>npm start</code>
+				</div>
+				<a
+					class="primary"
+					href="https://github.com/jonlarale/chaski"
+					target="_blank"
+					rel="noopener noreferrer"
+					>Get the source</a
+				>
+			</section>
+		</main>
+
+		<footer class="footer">
+			<div><strong>Chaski</strong> — keep your email in the terminal.</div>
+			<div class="footer-links">
+				<a
+					href="https://github.com/jonlarale/chaski/blob/main/readme.md"
+					target="_blank"
+					rel="noopener noreferrer"
+					>Documentation</a
+				>
+				<a
+					href="https://github.com/jonlarale/chaski/blob/main/LICENSE"
+					target="_blank"
+					rel="noopener noreferrer"
+					>MIT License</a
+				>
+				<a href="mailto:jonlarale@gmail.com">Contact</a>
+			</div>
+		</footer>
+	</body>
+</html>

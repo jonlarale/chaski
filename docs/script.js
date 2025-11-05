@@ -15,7 +15,7 @@ if (nav) {
 			toggle.setAttribute('aria-expanded', String(isOpen));
 		});
 
-		links.querySelectorAll('a').forEach((anchor) => {
+		links.querySelectorAll('a').forEach(anchor => {
 			anchor.addEventListener('click', () => {
 				if (nav.classList.contains('nav-open')) {
 					closeMenu();

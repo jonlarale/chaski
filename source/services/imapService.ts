@@ -343,10 +343,10 @@ Original error: ${err.message}`),
 		);
 
 		const fetch = this.imap!.seq.fetch(fetchRange, {
-			bodies: '',  // Gets the full message including attachments
-			struct: true,  // Gets the MIME structure
+			bodies: '', // Gets the full message including attachments
+			struct: true, // Gets the MIME structure
 			envelope: true,
-			markSeen: false,  // Don't mark as read when fetching
+			markSeen: false, // Don't mark as read when fetching
 		});
 
 		fetch.on('message', msg => {
@@ -435,10 +435,10 @@ Original error: ${err.message}`),
 				let message: EmailMessage | null = null;
 
 				const fetch = this.imap!.fetch(uid, {
-					bodies: '',  // Gets the full message including attachments
-					struct: true,  // Gets the MIME structure
+					bodies: '', // Gets the full message including attachments
+					struct: true, // Gets the MIME structure
 					envelope: true,
-					markSeen: false,  // Don't mark as read when fetching
+					markSeen: false, // Don't mark as read when fetching
 				});
 
 				fetch.on('message', msg => {
@@ -661,10 +661,10 @@ Original error: ${err.message}`),
 					// Fetch all the messages
 					const messages: EmailMessage[] = [];
 					const fetch = this.imap!.seq.fetch(results, {
-						bodies: '',  // Gets the full message including attachments
-						struct: true,  // Gets the MIME structure
+						bodies: '', // Gets the full message including attachments
+						struct: true, // Gets the MIME structure
 						envelope: true,
-						markSeen: false,  // Don't mark as read when fetching
+						markSeen: false, // Don't mark as read when fetching
 					});
 
 					fetch.on('message', msg => {

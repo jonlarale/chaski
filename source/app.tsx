@@ -97,8 +97,11 @@ const App = () => {
 	});
 	const [refreshTrigger, setRefreshTrigger] = useState(0);
 	const [assistantService] = useState(() => new AssistantService());
-	const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
-	const [assistantStatus, setAssistantStatus] = useState<AssistantStatus>('idle');
+	const [assistantMessages, setAssistantMessages] = useState<
+		AssistantMessage[]
+	>([]);
+	const [assistantStatus, setAssistantStatus] =
+		useState<AssistantStatus>('idle');
 	const [assistantError, setAssistantError] = useState<string | null>(null);
 	const app = useApp();
 	const {stdout} = useStdout();
@@ -146,15 +149,15 @@ const App = () => {
 			selectedFolder ||
 			'INBOX';
 		const accountIdFromMessage =
-			openedEmail?._original?.accountId ||
-			openedThread?._original?.accountId;
+			openedEmail?._original?.accountId || openedThread?._original?.accountId;
 		const accountFromMessage = accountIdFromMessage
 			? emailAccounts.find(acc => acc.id === accountIdFromMessage)
 			: undefined;
 		const accountFromSelection = selectedAccount
 			? emailAccounts.find(acc => acc.email === selectedAccount)
 			: undefined;
-		const account = accountFromMessage || accountFromSelection || emailAccounts[0];
+		const account =
+			accountFromMessage || accountFromSelection || emailAccounts[0];
 
 		if (!account) {
 			return assistantService.buildContextSnapshot([], {
@@ -240,7 +243,10 @@ const App = () => {
 				history,
 				context,
 			});
-			const assistantMessage = createAssistantMessage('assistant', response.reply);
+			const assistantMessage = createAssistantMessage(
+				'assistant',
+				response.reply,
+			);
 			setAssistantMessages(prev => [...prev, assistantMessage]);
 			setAssistantStatus('idle');
 			setAssistantError(null);
@@ -955,7 +961,7 @@ const App = () => {
 									console.log(`❌ Failed to download: ${result.error}`);
 								}
 							}
-							} else {
+						} else {
 							console.log('❌ Invalid attachment number');
 						}
 					} else {
@@ -978,7 +984,9 @@ const App = () => {
 
 					if (successful.length > 0) {
 						console.log(
-							`✅ Downloaded ${successful.length} file(s) to ${downloadService.getDownloadPath()}`,
+							`✅ Downloaded ${
+								successful.length
+							} file(s) to ${downloadService.getDownloadPath()}`,
 						);
 					}
 					if (failed.length > 0) {
@@ -1005,7 +1013,9 @@ const App = () => {
 				console.log('/refresh-all - Refresh all folders');
 				console.log('/refresh-inbox - Refresh inbox only');
 				console.log('/auto-refresh - Toggle auto-refresh on/off');
-				console.log('/auto-refresh-interval <n> - Set refresh interval (minutes)');
+				console.log(
+					'/auto-refresh-interval <n> - Set refresh interval (minutes)',
+				);
 				console.log('/cache-status - Show cache statistics');
 				console.log('/cache-clear - Clear all cached data');
 				console.log('/download <n> - Download attachment n (in email view)');
@@ -1165,12 +1175,12 @@ const App = () => {
 						</Box>
 					</Box>
 					<AssistantPanel
-					messages={assistantMessages}
-					status={assistantStatus}
-					error={assistantError}
-				/>
+						messages={assistantMessages}
+						status={assistantStatus}
+						error={assistantError}
+					/>
 
-				<CommandInput
+					<CommandInput
 						isActive={commandInputActive}
 						onDeactivate={() => setCommandInputActive(false)}
 						onCommand={handleCommand}

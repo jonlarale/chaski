@@ -24,19 +24,19 @@ We as members, contributors, and leaders pledge to make participation in our com
 
 Examples of behavior that contributes to a positive environment:
 
-* Using welcoming and inclusive language
-* Being respectful of differing viewpoints and experiences
-* Gracefully accepting constructive criticism
-* Focusing on what is best for the community
-* Showing empathy towards other community members
+- Using welcoming and inclusive language
+- Being respectful of differing viewpoints and experiences
+- Gracefully accepting constructive criticism
+- Focusing on what is best for the community
+- Showing empathy towards other community members
 
 Examples of unacceptable behavior:
 
-* The use of sexualized language or imagery
-* Trolling, insulting/derogatory comments, and personal attacks
-* Public or private harassment
-* Publishing others' private information without permission
-* Other conduct which could reasonably be considered inappropriate
+- The use of sexualized language or imagery
+- Trolling, insulting/derogatory comments, and personal attacks
+- Public or private harassment
+- Publishing others' private information without permission
+- Other conduct which could reasonably be considered inappropriate
 
 ## Getting Started
 
@@ -52,40 +52,40 @@ Examples of unacceptable behavior:
 
 Before creating bug reports, please check existing issues to avoid duplicates. When creating a bug report, please include:
 
-* **Clear and descriptive title**
-* **Steps to reproduce** the problem
-* **Expected behavior** vs actual behavior
-* **Screenshots** if applicable
-* **System information** (OS, Node version, terminal)
-* **Error messages** and stack traces
-* **Configuration** that might be relevant
+- **Clear and descriptive title**
+- **Steps to reproduce** the problem
+- **Expected behavior** vs actual behavior
+- **Screenshots** if applicable
+- **System information** (OS, Node version, terminal)
+- **Error messages** and stack traces
+- **Configuration** that might be relevant
 
 ### Suggesting Enhancements
 
 Enhancement suggestions are tracked as GitHub issues. When creating an enhancement suggestion, please include:
 
-* **Use case** - Explain why this enhancement would be useful
-* **Proposed solution** - Describe the desired behavior
-* **Alternatives considered** - What other solutions did you consider?
-* **Additional context** - Add any other context or screenshots
+- **Use case** - Explain why this enhancement would be useful
+- **Proposed solution** - Describe the desired behavior
+- **Alternatives considered** - What other solutions did you consider?
+- **Additional context** - Add any other context or screenshots
 
 ### Your First Code Contribution
 
 Unsure where to begin? You can start by looking through these issues:
 
-* `good first issue` - Simple issues for beginners
-* `help wanted` - Issues where we need community help
-* `documentation` - Documentation improvements
-* `bug` - Known bugs that need fixing
+- `good first issue` - Simple issues for beginners
+- `help wanted` - Issues where we need community help
+- `documentation` - Documentation improvements
+- `bug` - Known bugs that need fixing
 
 ## Development Setup
 
 ### Prerequisites
 
-* Node.js 16+ and npm
-* Git
-* A terminal with UTF-8 support
-* (Optional) An email account for testing
+- Node.js 16+ and npm
+- Git
+- A terminal with UTF-8 support
+- (Optional) An email account for testing
 
 ### Setting Up Your Development Environment
 
@@ -157,19 +157,21 @@ chaski/
 ### Pull Request Guidelines
 
 1. **Create a descriptive title** - Use conventional commit format if possible:
-   * `feat:` New feature
-   * `fix:` Bug fix
-   * `docs:` Documentation changes
-   * `style:` Code style changes (formatting, etc.)
-   * `refactor:` Code refactoring
-   * `test:` Test additions or changes
-   * `chore:` Maintenance tasks
+
+   - `feat:` New feature
+   - `fix:` Bug fix
+   - `docs:` Documentation changes
+   - `style:` Code style changes (formatting, etc.)
+   - `refactor:` Code refactoring
+   - `test:` Test additions or changes
+   - `chore:` Maintenance tasks
 
 2. **Write a comprehensive description** including:
-   * What changes were made and why
-   * Any breaking changes
-   * Related issue numbers (fixes #123)
-   * Screenshots for UI changes
+
+   - What changes were made and why
+   - Any breaking changes
+   - Related issue numbers (fixes #123)
+   - Screenshots for UI changes
 
 3. **Keep PRs focused** - One feature/fix per PR
 
@@ -181,30 +183,30 @@ chaski/
 
 ### TypeScript/JavaScript
 
-* **Use TypeScript** for all new code
-* **Follow existing patterns** in the codebase
-* **Use meaningful variable names** - prefer clarity over brevity
-* **Add type definitions** for all functions and complex data structures
-* **Document complex logic** with inline comments
-* **Use async/await** instead of callbacks
-* **Handle errors properly** - never silently fail
+- **Use TypeScript** for all new code
+- **Follow existing patterns** in the codebase
+- **Use meaningful variable names** - prefer clarity over brevity
+- **Add type definitions** for all functions and complex data structures
+- **Document complex logic** with inline comments
+- **Use async/await** instead of callbacks
+- **Handle errors properly** - never silently fail
 
 ### React/Ink Components
 
-* **Use functional components** with hooks
-* **Keep components small** and focused
-* **Extract reusable logic** into custom hooks
-* **Use proper prop types** with TypeScript interfaces
-* **Memoize expensive computations** with useMemo
-* **Handle loading and error states** appropriately
+- **Use functional components** with hooks
+- **Keep components small** and focused
+- **Extract reusable logic** into custom hooks
+- **Use proper prop types** with TypeScript interfaces
+- **Memoize expensive computations** with useMemo
+- **Handle loading and error states** appropriately
 
 ### File Organization
 
-* **One component per file** (with few exceptions)
-* **Group related files** in directories
-* **Use index files** to simplify imports
-* **Keep services separate** from UI components
-* **Place types** in dedicated type files
+- **One component per file** (with few exceptions)
+- **Group related files** in directories
+- **Use index files** to simplify imports
+- **Keep services separate** from UI components
+- **Place types** in dedicated type files
 
 ### Code Style
 
@@ -212,52 +214,55 @@ We use Prettier and XO for code formatting and linting:
 
 ```json
 {
-  "prettier": {
-    "singleQuote": true,
-    "useTabs": true,
-    "bracketSpacing": false
-  }
+	"prettier": {
+		"singleQuote": true,
+		"useTabs": true,
+		"bracketSpacing": false
+	}
 }
 ```
 
 ### Best Practices
 
 1. **Security First**
-   * Never log sensitive information
-   * Always validate user input
-   * Use encryption for stored credentials
-   * Follow OWASP guidelines
+
+   - Never log sensitive information
+   - Always validate user input
+   - Use encryption for stored credentials
+   - Follow OWASP guidelines
 
 2. **Performance**
-   * Optimize database queries
-   * Implement proper caching strategies
-   * Avoid blocking operations
-   * Use pagination for large datasets
+
+   - Optimize database queries
+   - Implement proper caching strategies
+   - Avoid blocking operations
+   - Use pagination for large datasets
 
 3. **User Experience**
-   * Provide clear error messages
-   * Show loading indicators
-   * Implement keyboard shortcuts consistently
-   * Maintain responsive UI
+
+   - Provide clear error messages
+   - Show loading indicators
+   - Implement keyboard shortcuts consistently
+   - Maintain responsive UI
 
 4. **Code Quality**
-   * Write self-documenting code
-   * Keep functions small (< 50 lines ideally)
-   * Avoid deep nesting (max 3 levels)
-   * Use early returns to reduce complexity
-   * DRY (Don't Repeat Yourself)
-   * SOLID principles
+   - Write self-documenting code
+   - Keep functions small (< 50 lines ideally)
+   - Avoid deep nesting (max 3 levels)
+   - Use early returns to reduce complexity
+   - DRY (Don't Repeat Yourself)
+   - SOLID principles
 
 ## Testing Guidelines
 
 ### Writing Tests
 
-* **Test file naming**: `*.test.ts` or `*.test.tsx`
-* **Use descriptive test names** that explain what is being tested
-* **Follow AAA pattern**: Arrange, Act, Assert
-* **Mock external dependencies** appropriately
-* **Test edge cases** and error conditions
-* **Aim for high coverage** but focus on meaningful tests
+- **Test file naming**: `*.test.ts` or `*.test.tsx`
+- **Use descriptive test names** that explain what is being tested
+- **Follow AAA pattern**: Arrange, Act, Assert
+- **Mock external dependencies** appropriately
+- **Test edge cases** and error conditions
+- **Aim for high coverage** but focus on meaningful tests
 
 ### Test Categories
 
@@ -285,7 +290,8 @@ npx ava source/services/emailService.test.ts
 
 ### Code Documentation
 
-* **Add JSDoc comments** for public APIs:
+- **Add JSDoc comments** for public APIs:
+
   ```typescript
   /**
    * Fetches messages from the specified folder
@@ -298,9 +304,9 @@ npx ava source/services/emailService.test.ts
   async getMessages(accountId: string, folder: string, limit?: number): Promise<EmailMessage[]>
   ```
 
-* **Document complex algorithms** with inline comments
-* **Update README.md** for user-facing changes
-* **Add to CHANGELOG.md** for significant changes
+- **Document complex algorithms** with inline comments
+- **Update README.md** for user-facing changes
+- **Add to CHANGELOG.md** for significant changes
 
 ### Commit Messages
 
@@ -315,6 +321,7 @@ Follow conventional commits format:
 ```
 
 Examples:
+
 ```
 feat(email): add support for attachments
 fix(cache): resolve memory leak in message caching
@@ -326,31 +333,32 @@ refactor(ui): simplify message list component
 
 ### Getting Help
 
-* **GitHub Issues** - For bugs and feature requests
-* **Discussions** - For general questions and ideas
-* **Email** - Contact the maintainer at jonlarale@gmail.com
+- **GitHub Issues** - For bugs and feature requests
+- **Discussions** - For general questions and ideas
+- **Email** - Contact the maintainer at jonlarale@gmail.com
 
 ### Recognition
 
 Contributors will be recognized in:
-* The project README
-* Release notes
-* A dedicated CONTRIBUTORS.md file
+
+- The project README
+- Release notes
+- A dedicated CONTRIBUTORS.md file
 
 ## Additional Resources
 
 ### Useful Links
 
-* [Ink Documentation](https://github.com/vadimdemedes/ink)
-* [TypeScript Handbook](https://www.typescriptlang.org/docs/)
-* [Node.js Best Practices](https://github.com/goldbergyoni/nodebestpractices)
-* [Conventional Commits](https://www.conventionalcommits.org/)
+- [Ink Documentation](https://github.com/vadimdemedes/ink)
+- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
+- [Node.js Best Practices](https://github.com/goldbergyoni/nodebestpractices)
+- [Conventional Commits](https://www.conventionalcommits.org/)
 
 ### Development Tools
 
-* [VS Code](https://code.visualstudio.com/) - Recommended editor
-* [Node Inspector](https://nodejs.org/en/docs/guides/debugging-getting-started/) - For debugging
-* [Postman](https://www.postman.com/) - For API testing
+- [VS Code](https://code.visualstudio.com/) - Recommended editor
+- [Node Inspector](https://nodejs.org/en/docs/guides/debugging-getting-started/) - For debugging
+- [Postman](https://www.postman.com/) - For API testing
 
 ## License
 

@@ -92,17 +92,6 @@ const convertEmailMessage = (email: EmailMessage): Message => {
 	const date = new Date(email.date);
 	const dateString = formatRelativeDate(date);
 
-	// Debug: Log date parsing for troubleshooting
-	if (email.subject.includes('Docusign')) {
-		console.error('DATE_DEBUG:', {
-			subject: email.subject,
-			originalDate: email.date instanceof Date ? email.date.toISOString() : email.date,
-			parsedDate: date.toISOString(),
-			dateString,
-			now: new Date().toISOString(),
-		});
-	}
-
 	// Check for thread count based on references
 	const threadCount = email.references ? email.references.length : undefined;
 
@@ -534,16 +523,6 @@ const MessageList: React.FC<MessageListProps> = ({
 				console.log(
 					`Loading messages ${startSeq}:${endSeq} for page ${currentPage} (total: ${actualTotalMessages}, maxSeq: ${maxSequenceNumber})`,
 				);
-
-				// Also log to debug.log for verification
-				debug.info('SEQUENCE_RANGE_CALCULATION', {
-					startSeq,
-					endSeq,
-					currentPage,
-					actualTotalMessages,
-					maxSequenceNumber,
-					range: `${startSeq}:${endSeq}`,
-				});
 
 				// Load messages for current page
 				const pageMessages = await emailService.getMessages(

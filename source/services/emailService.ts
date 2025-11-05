@@ -198,7 +198,7 @@ export class EmailService {
 	async getFolderStatus(
 		accountId: string,
 		folder: string,
-	): Promise<{total: number; unseen: number}> {
+	): Promise<{total: number; unseen: number; maxSequence: number}> {
 		const imap = await this.getImapService(accountId);
 		return imap.getFolderStatus(folder);
 	}

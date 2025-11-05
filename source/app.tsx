@@ -492,6 +492,7 @@ const App = () => {
 					);
 
 					const totalMessages = folderStatus.total;
+					const maxSequence = folderStatus.maxSequence;
 					let allMessages: any[] = [];
 
 					// Smart refresh strategy:
@@ -504,7 +505,9 @@ const App = () => {
 							// Initial load - fetch progressively
 							const firstBatchSize = 50;
 							const regularBatchSize = 500;
-							const firstEndSeq = totalMessages;
+							// Use maxSequence instead of totalMessages to avoid missing messages
+							// when there are deleted messages with gaps in sequence numbers
+							const firstEndSeq = maxSequence;
 							const firstStartSeq = Math.max(
 								1,
 								firstEndSeq - firstBatchSize + 1,
@@ -579,7 +582,8 @@ const App = () => {
 						} else {
 							// Regular refresh - only fetch new messages
 							const messagesToCheck = 200; // Check last 200 messages for new ones
-							const endSeq = totalMessages;
+							// Use maxSequence to ensure we get the most recent messages
+							const endSeq = maxSequence;
 							const startSeq = Math.max(1, endSeq - messagesToCheck + 1);
 							const sequenceRange = `${startSeq}:${endSeq}`;
 
@@ -668,7 +672,8 @@ const App = () => {
 						// For quick refresh, always fetch the most recent messages
 						// This ensures we don't miss any new messages
 						const messagesToFetch = 100; // Fetch last 100 messages for quick refresh
-						const endSeq = folderStatus.total;
+						// Use maxSequence to ensure we get the most recent messages
+						const endSeq = folderStatus.maxSequence;
 						const startSeq = Math.max(1, endSeq - messagesToFetch + 1);
 						const sequenceRange = `${startSeq}:${endSeq}`;
 

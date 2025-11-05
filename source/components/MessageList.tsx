@@ -92,6 +92,17 @@ const convertEmailMessage = (email: EmailMessage): Message => {
 	const date = new Date(email.date);
 	const dateString = formatRelativeDate(date);
 
+	// Debug: Log date parsing for troubleshooting
+	if (email.subject.includes('Docusign')) {
+		console.error('DATE_DEBUG:', {
+			subject: email.subject,
+			originalDate: email.date instanceof Date ? email.date.toISOString() : email.date,
+			parsedDate: date.toISOString(),
+			dateString,
+			now: new Date().toISOString(),
+		});
+	}
+
 	// Check for thread count based on references
 	const threadCount = email.references ? email.references.length : undefined;
 
@@ -458,6 +469,7 @@ const MessageList: React.FC<MessageListProps> = ({
 				// Always get the actual total count from the folder
 				// This ensures we have accurate pagination info
 				let actualTotalMessages = totalMessages;
+				let maxSequenceNumber = totalMessages;
 				try {
 					const folderStatus = await emailService.getFolderStatus(
 						emailAccount.id,
@@ -467,18 +479,22 @@ const MessageList: React.FC<MessageListProps> = ({
 						folder: actualFolderName,
 						total: folderStatus.total,
 						unseen: folderStatus.unseen,
+						maxSequence: folderStatus.maxSequence,
 						currentPage,
 					});
 					actualTotalMessages = folderStatus.total;
+					maxSequenceNumber = folderStatus.maxSequence;
 					setTotalMessages(folderStatus.total);
 				} catch (err) {
 					console.error('Failed to get folder status:', err);
 					// If we can't get status and don't have a total, estimate
 					if (totalMessages === 0) {
 						actualTotalMessages = 100;
+						maxSequenceNumber = 100;
 						setTotalMessages(100);
 					} else {
 						actualTotalMessages = totalMessages;
+						maxSequenceNumber = totalMessages;
 					}
 				}
 
@@ -497,9 +513,11 @@ const MessageList: React.FC<MessageListProps> = ({
 				// For page 1: we want messages from (total - 19) to total
 				// For page 2: we want messages from (total - 39) to (total - 20)
 				// But we need to account for gaps due to deleted messages
+				// IMPORTANT: Use maxSequence (highest sequence number) instead of actualTotal
+				// to avoid missing messages when there are deleted messages with gaps
 				const endSeq = Math.max(
 					1,
-					actualTotalMessages - (currentPage - 1) * messagesPerPage,
+					maxSequenceNumber - (currentPage - 1) * messagesPerPage,
 				);
 
 				// Fetch 50% more messages to account for gaps
@@ -514,8 +532,18 @@ const MessageList: React.FC<MessageListProps> = ({
 				}
 
 				console.log(
-					`Loading messages ${startSeq}:${endSeq} for page ${currentPage} (total: ${actualTotalMessages})`,
+					`Loading messages ${startSeq}:${endSeq} for page ${currentPage} (total: ${actualTotalMessages}, maxSeq: ${maxSequenceNumber})`,
 				);
+
+				// Also log to debug.log for verification
+				debug.info('SEQUENCE_RANGE_CALCULATION', {
+					startSeq,
+					endSeq,
+					currentPage,
+					actualTotalMessages,
+					maxSequenceNumber,
+					range: `${startSeq}:${endSeq}`,
+				});
 
 				// Load messages for current page
 				const pageMessages = await emailService.getMessages(

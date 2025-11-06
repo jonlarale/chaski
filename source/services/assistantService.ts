@@ -48,13 +48,11 @@ export class AssistantService {
 			messages: limited.map(email => {
 				const from = Array.isArray(email.from)
 					? email.from
-						.map(entry =>
-							entry.name
-								? `${entry.name} <${entry.address}>`
-								: entry.address,
-						)
-						.filter(Boolean)
-						.join(', ')
+							.map(entry =>
+								entry.name ? `${entry.name} <${entry.address}>` : entry.address,
+							)
+							.filter(Boolean)
+							.join(', ')
 					: undefined;
 
 				return {
@@ -68,8 +66,8 @@ export class AssistantService {
 						email.date instanceof Date
 							? email.date.toISOString()
 							: email.date
-						? String(email.date)
-						: undefined,
+							? String(email.date)
+							: undefined,
 				};
 			}),
 		};

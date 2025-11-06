@@ -458,6 +458,7 @@ const MessageList: React.FC<MessageListProps> = ({
 				// Always get the actual total count from the folder
 				// This ensures we have accurate pagination info
 				let actualTotalMessages = totalMessages;
+				let maxSequenceNumber = totalMessages;
 				try {
 					const folderStatus = await emailService.getFolderStatus(
 						emailAccount.id,
@@ -467,18 +468,22 @@ const MessageList: React.FC<MessageListProps> = ({
 						folder: actualFolderName,
 						total: folderStatus.total,
 						unseen: folderStatus.unseen,
+						maxSequence: folderStatus.maxSequence,
 						currentPage,
 					});
 					actualTotalMessages = folderStatus.total;
+					maxSequenceNumber = folderStatus.maxSequence;
 					setTotalMessages(folderStatus.total);
 				} catch (err) {
 					console.error('Failed to get folder status:', err);
 					// If we can't get status and don't have a total, estimate
 					if (totalMessages === 0) {
 						actualTotalMessages = 100;
+						maxSequenceNumber = 100;
 						setTotalMessages(100);
 					} else {
 						actualTotalMessages = totalMessages;
+						maxSequenceNumber = totalMessages;
 					}
 				}
 
@@ -497,9 +502,11 @@ const MessageList: React.FC<MessageListProps> = ({
 				// For page 1: we want messages from (total - 19) to total
 				// For page 2: we want messages from (total - 39) to (total - 20)
 				// But we need to account for gaps due to deleted messages
+				// IMPORTANT: Use maxSequence (highest sequence number) instead of actualTotal
+				// to avoid missing messages when there are deleted messages with gaps
 				const endSeq = Math.max(
 					1,
-					actualTotalMessages - (currentPage - 1) * messagesPerPage,
+					maxSequenceNumber - (currentPage - 1) * messagesPerPage,
 				);
 
 				// Fetch 50% more messages to account for gaps
@@ -514,7 +521,7 @@ const MessageList: React.FC<MessageListProps> = ({
 				}
 
 				console.log(
-					`Loading messages ${startSeq}:${endSeq} for page ${currentPage} (total: ${actualTotalMessages})`,
+					`Loading messages ${startSeq}:${endSeq} for page ${currentPage} (total: ${actualTotalMessages}, maxSeq: ${maxSequenceNumber})`,
 				);
 
 				// Load messages for current page

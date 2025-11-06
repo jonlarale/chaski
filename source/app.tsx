@@ -97,8 +97,11 @@ const App = () => {
 	});
 	const [refreshTrigger, setRefreshTrigger] = useState(0);
 	const [assistantService] = useState(() => new AssistantService());
-	const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
-	const [assistantStatus, setAssistantStatus] = useState<AssistantStatus>('idle');
+	const [assistantMessages, setAssistantMessages] = useState<
+		AssistantMessage[]
+	>([]);
+	const [assistantStatus, setAssistantStatus] =
+		useState<AssistantStatus>('idle');
 	const [assistantError, setAssistantError] = useState<string | null>(null);
 	const app = useApp();
 	const {stdout} = useStdout();
@@ -146,15 +149,15 @@ const App = () => {
 			selectedFolder ||
 			'INBOX';
 		const accountIdFromMessage =
-			openedEmail?._original?.accountId ||
-			openedThread?._original?.accountId;
+			openedEmail?._original?.accountId || openedThread?._original?.accountId;
 		const accountFromMessage = accountIdFromMessage
 			? emailAccounts.find(acc => acc.id === accountIdFromMessage)
 			: undefined;
 		const accountFromSelection = selectedAccount
 			? emailAccounts.find(acc => acc.email === selectedAccount)
 			: undefined;
-		const account = accountFromMessage || accountFromSelection || emailAccounts[0];
+		const account =
+			accountFromMessage || accountFromSelection || emailAccounts[0];
 
 		if (!account) {
 			return assistantService.buildContextSnapshot([], {
@@ -240,7 +243,10 @@ const App = () => {
 				history,
 				context,
 			});
-			const assistantMessage = createAssistantMessage('assistant', response.reply);
+			const assistantMessage = createAssistantMessage(
+				'assistant',
+				response.reply,
+			);
 			setAssistantMessages(prev => [...prev, assistantMessage]);
 			setAssistantStatus('idle');
 			setAssistantError(null);
@@ -492,6 +498,7 @@ const App = () => {
 					);
 
 					const totalMessages = folderStatus.total;
+					const maxSequence = folderStatus.maxSequence;
 					let allMessages: any[] = [];
 
 					// Smart refresh strategy:
@@ -504,7 +511,9 @@ const App = () => {
 							// Initial load - fetch progressively
 							const firstBatchSize = 50;
 							const regularBatchSize = 500;
-							const firstEndSeq = totalMessages;
+							// Use maxSequence instead of totalMessages to avoid missing messages
+							// when there are deleted messages with gaps in sequence numbers
+							const firstEndSeq = maxSequence;
 							const firstStartSeq = Math.max(
 								1,
 								firstEndSeq - firstBatchSize + 1,
@@ -579,7 +588,8 @@ const App = () => {
 						} else {
 							// Regular refresh - only fetch new messages
 							const messagesToCheck = 200; // Check last 200 messages for new ones
-							const endSeq = totalMessages;
+							// Use maxSequence to ensure we get the most recent messages
+							const endSeq = maxSequence;
 							const startSeq = Math.max(1, endSeq - messagesToCheck + 1);
 							const sequenceRange = `${startSeq}:${endSeq}`;
 
@@ -668,7 +678,8 @@ const App = () => {
 						// For quick refresh, always fetch the most recent messages
 						// This ensures we don't miss any new messages
 						const messagesToFetch = 100; // Fetch last 100 messages for quick refresh
-						const endSeq = folderStatus.total;
+						// Use maxSequence to ensure we get the most recent messages
+						const endSeq = folderStatus.maxSequence;
 						const startSeq = Math.max(1, endSeq - messagesToFetch + 1);
 						const sequenceRange = `${startSeq}:${endSeq}`;
 
@@ -950,7 +961,7 @@ const App = () => {
 									console.log(`❌ Failed to download: ${result.error}`);
 								}
 							}
-							} else {
+						} else {
 							console.log('❌ Invalid attachment number');
 						}
 					} else {
@@ -973,7 +984,9 @@ const App = () => {
 
 					if (successful.length > 0) {
 						console.log(
-							`✅ Downloaded ${successful.length} file(s) to ${downloadService.getDownloadPath()}`,
+							`✅ Downloaded ${
+								successful.length
+							} file(s) to ${downloadService.getDownloadPath()}`,
 						);
 					}
 					if (failed.length > 0) {
@@ -1000,7 +1013,9 @@ const App = () => {
 				console.log('/refresh-all - Refresh all folders');
 				console.log('/refresh-inbox - Refresh inbox only');
 				console.log('/auto-refresh - Toggle auto-refresh on/off');
-				console.log('/auto-refresh-interval <n> - Set refresh interval (minutes)');
+				console.log(
+					'/auto-refresh-interval <n> - Set refresh interval (minutes)',
+				);
 				console.log('/cache-status - Show cache statistics');
 				console.log('/cache-clear - Clear all cached data');
 				console.log('/download <n> - Download attachment n (in email view)');
@@ -1160,12 +1175,12 @@ const App = () => {
 						</Box>
 					</Box>
 					<AssistantPanel
-					messages={assistantMessages}
-					status={assistantStatus}
-					error={assistantError}
-				/>
+						messages={assistantMessages}
+						status={assistantStatus}
+						error={assistantError}
+					/>
 
-				<CommandInput
+					<CommandInput
 						isActive={commandInputActive}
 						onDeactivate={() => setCommandInputActive(false)}
 						onCommand={handleCommand}

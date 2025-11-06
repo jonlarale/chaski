@@ -204,7 +204,7 @@ Press `/` to open the command palette:
 | `/cache-status`              | Show cache statistics               |
 | `/cache-clear`               | Clear all cached data               |
 | `/settings`                  | Open settings dialog                |
-| `/assistant-clear`          | Reset assistant conversation        |
+| `/assistant-clear`           | Reset assistant conversation        |
 | `/help`                      | Show all commands                   |
 | `/quit`                      | Exit the application                |
 

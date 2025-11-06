@@ -1,6 +1,6 @@
 {
 	"name": "chaski",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"license": "MIT",
 	"bin": "dist/cli.js",
 	"type": "module",
@@ -67,8 +67,12 @@
 	"xo": {
 		"extends": "xo-react",
 		"prettier": true,
+		"ignores": [
+			"docs/**"
+		],
 		"rules": {
-			"react/prop-types": "off"
+			"react/prop-types": "off",
+			"unicorn/expiring-todo-comments": "off"
 		}
 	},
 	"prettier": "@vdemedes/prettier-config"

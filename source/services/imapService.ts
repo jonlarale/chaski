@@ -343,10 +343,10 @@ Original error: ${err.message}`),
 		);
 
 		const fetch = this.imap!.seq.fetch(fetchRange, {
-			bodies: '',  // Gets the full message including attachments
-			struct: true,  // Gets the MIME structure
+			bodies: '', // Gets the full message including attachments
+			struct: true, // Gets the MIME structure
 			envelope: true,
-			markSeen: false,  // Don't mark as read when fetching
+			markSeen: false, // Don't mark as read when fetching
 		});
 
 		fetch.on('message', msg => {
@@ -435,10 +435,10 @@ Original error: ${err.message}`),
 				let message: EmailMessage | null = null;
 
 				const fetch = this.imap!.fetch(uid, {
-					bodies: '',  // Gets the full message including attachments
-					struct: true,  // Gets the MIME structure
+					bodies: '', // Gets the full message including attachments
+					struct: true, // Gets the MIME structure
 					envelope: true,
-					markSeen: false,  // Don't mark as read when fetching
+					markSeen: false, // Don't mark as read when fetching
 				});
 
 				fetch.on('message', msg => {
@@ -546,7 +546,7 @@ Original error: ${err.message}`),
 
 	async getFolderStatus(
 		folder: string,
-	): Promise<{total: number; unseen: number}> {
+	): Promise<{total: number; unseen: number; maxSequence: number}> {
 		if (!this.imap) throw new Error('Not connected');
 
 		return new Promise((resolve, reject) => {
@@ -556,6 +556,9 @@ Original error: ${err.message}`),
 					return;
 				}
 
+				// Store the maximum sequence number (highest sequence in mailbox)
+				const maxSequence = box.messages.total || 0;
+
 				// Search for ALL messages to get accurate count (handles deleted messages)
 				this.imap!.search(['ALL'], (searchErr, allResults) => {
 					if (searchErr) {
@@ -564,6 +567,7 @@ Original error: ${err.message}`),
 						resolve({
 							total,
 							unseen: box.messages.new || 0,
+							maxSequence,
 						});
 						return;
 					}
@@ -573,7 +577,7 @@ Original error: ${err.message}`),
 					debugLog(
 						LogLevel.INFO,
 						'ImapService',
-						`getFolderStatus: Found ${actualTotal} actual messages (box reports ${box.messages.total})`,
+						`getFolderStatus: Found ${actualTotal} actual messages (box reports ${box.messages.total} max sequence)`,
 					);
 
 					// Search for unseen messages
@@ -582,6 +586,7 @@ Original error: ${err.message}`),
 							resolve({
 								total: actualTotal,
 								unseen: box.messages.new || 0,
+								maxSequence,
 							});
 							return;
 						}
@@ -590,6 +595,7 @@ Original error: ${err.message}`),
 						resolve({
 							total: actualTotal,
 							unseen,
+							maxSequence,
 						});
 					});
 				});
@@ -655,10 +661,10 @@ Original error: ${err.message}`),
 					// Fetch all the messages
 					const messages: EmailMessage[] = [];
 					const fetch = this.imap!.seq.fetch(results, {
-						bodies: '',  // Gets the full message including attachments
-						struct: true,  // Gets the MIME structure
+						bodies: '', // Gets the full message including attachments
+						struct: true, // Gets the MIME structure
 						envelope: true,
-						markSeen: false,  // Don't mark as read when fetching
+						markSeen: false, // Don't mark as read when fetching
 					});
 
 					fetch.on('message', msg => {

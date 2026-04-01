@@ -18,6 +18,7 @@ A secure, feature-rich terminal-based email client built with React (Ink) and Ty
 - 🔄 **Auto-Refresh** - Configurable automatic email synchronization
 - 💾 **Smart Caching** - SQLite-based message caching for offline access
 - 🤖 **AI Inbox Assistant** - Ask contextual questions about your mail directly from the command bar (OpenAI key required)
+- 🔌 **MCP Server** - Expose your email as tools for AI agents via the [Model Context Protocol](https://modelcontextprotocol.io)
 - ⌨️ **Vim-style Navigation** - Intuitive keyboard shortcuts
 - 🎨 **Beautiful TUI** - Clean, responsive terminal interface
 - 📝 **Full Email Capabilities** - Read, compose, reply, and forward emails
@@ -88,6 +89,84 @@ Chaski includes a contextual assistant that answers questions about the email al
 3. Run the app with `npm start` or `chaski`; the process loads `.env` automatically.
 
 Once configured, type any message without a leading `/` in the command bar to chat with the assistant. The bottom panel surfaces the recent history and request status. Use `/assistant-clear` whenever you need a fresh conversation. The default model is `gpt-4o-mini`, and only local mail summaries are sent—no unrelated data leaves your machine.
+
+## MCP Server
+
+Chaski ships with a built-in [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server that lets AI agents read, search, and send emails on your behalf. The server reuses the same service layer as the interactive TUI, so anything you can do in the terminal you can also do programmatically.
+
+### Running the MCP Server
+
+```bash
+# With tsx (development)
+npm run mcp
+
+# With the compiled build
+npm run build
+npm run mcp:build
+
+# Or directly
+npx tsx source/mcp/index.ts
+```
+
+The server communicates over **stdio** (JSON-RPC), which is the standard transport for local MCP integrations such as Claude Code and other AI-powered tools.
+
+### Configuring with Claude Code
+
+Add Chaski to your Claude Code MCP settings (`~/.claude/settings.json` or project-level `.claude/settings.json`):
+
+```json
+{
+	"mcpServers": {
+		"chaski": {
+			"command": "npx",
+			"args": ["tsx", "/absolute/path/to/chaski/source/mcp/index.ts"]
+		}
+	}
+}
+```
+
+After configuration, Claude Code will have access to all Chaski tools automatically.
+
+### Available MCP Tools
+
+| Tool                  | Description                                                      |
+| --------------------- | ---------------------------------------------------------------- |
+| `list-accounts`       | List configured email accounts (credentials are never exposed)   |
+| `list-folders`        | List all folders/mailboxes for an account                        |
+| `get-folder-status`   | Get total and unread message counts for a folder                 |
+| `list-messages`       | List messages from the local cache (fast, use after refresh)     |
+| `read-message`        | Read a single email with its full body                           |
+| `get-thread`          | Retrieve all messages in a conversation thread                   |
+| `search-messages`     | Search cached messages by subject, sender, or preview content    |
+| `send-email`          | Send an email (compose, reply, or forward)                       |
+| `mark-as-read`        | Mark a message as read                                           |
+| `delete-message`      | Delete a message                                                 |
+| `refresh-folder`      | Sync messages from the IMAP server into the local cache          |
+| `get-cache-status`    | Get statistics about the local SQLite cache                      |
+| `ask-assistant`       | Ask the AI assistant a question about your emails (needs OpenAI) |
+| `download-attachment` | Download an email attachment to disk                             |
+
+### Available MCP Resources
+
+| Resource URI                            | Description                         |
+| --------------------------------------- | ----------------------------------- |
+| `chaski://accounts`                     | All configured accounts (sanitized) |
+| `chaski://accounts/{accountId}/folders` | Folder tree for a specific account  |
+| `chaski://settings`                     | Current user settings               |
+
+### Testing with MCP Inspector
+
+You can interactively test all tools using the official MCP Inspector:
+
+```bash
+npx @modelcontextprotocol/inspector npx tsx source/mcp/index.ts
+```
+
+### Security Notes
+
+- Credentials (passwords, OAuth tokens, client secrets) are **never** exposed through MCP responses. All account data is sanitized before being returned.
+- The MCP server runs locally and communicates over stdio — no network ports are opened.
+- Attachment binary content is not included in message responses; use `download-attachment` to save specific files to disk.
 
 ## Configuration
 
@@ -298,7 +377,9 @@ chaski/
 │   ├── cli.tsx           # CLI entry point
 │   ├── components/       # UI components
 │   ├── services/         # Email, storage, cache services
+│   ├── mcp/              # MCP server (tools, resources, schemas)
 │   ├── types/            # TypeScript type definitions
+│   ├── utils/            # Utility functions
 │   └── constants/        # UI constants and themes
 ├── dist/                 # Compiled JavaScript
 └── test/                 # Test files

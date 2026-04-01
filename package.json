@@ -2,7 +2,10 @@
 	"name": "chaski",
 	"version": "0.2.1",
 	"license": "MIT",
-	"bin": "dist/cli.js",
+	"bin": {
+		"chaski": "dist/cli.js",
+		"chaski-mcp": "dist/mcp/index.js"
+	},
 	"type": "module",
 	"engines": {
 		"node": ">=16"
@@ -11,6 +14,8 @@
 		"build": "tsc",
 		"dev": "tsc --watch",
 		"start": "tsx source/start.tsx",
+		"mcp": "tsx source/mcp/index.ts",
+		"mcp:build": "node dist/mcp/index.js",
 		"test": "prettier --check . && xo && ava"
 	},
 	"files": [
@@ -18,7 +23,9 @@
 	],
 	"dependencies": {
 		"@azure/msal-node": "^3.6.1",
+		"@modelcontextprotocol/sdk": "^1.29.0",
 		"better-sqlite3": "^12.2.0",
+		"dotenv": "^16.4.5",
 		"google-auth-library": "^10.1.0",
 		"ink": "^4.1.0",
 		"ink-big-text": "^2.0.0",
@@ -30,9 +37,9 @@
 		"meow": "^11.0.0",
 		"node-imap": "^0.9.6",
 		"nodemailer": "^7.0.3",
-		"react": "^18.2.0",
 		"openai": "^4.55.0",
-		"dotenv": "^16.4.5"
+		"react": "^18.2.0",
+		"zod": "^3.25.76"
 	},
 	"devDependencies": {
 		"@sindresorhus/tsconfig": "^3.0.1",

@@ -8,7 +8,7 @@ import {
 } from '../types/email.js';
 import {OAuth2Service} from './oauth2Service.js';
 import {AccountStorageService} from './accountStorageService.js';
-import {debugLog, LogLevel} from '../utils/debug.js';
+import {debugLog, LogLevel} from '../utils/debug-core.js';
 
 export class ImapService {
 	private imap: Imap | null = null;
@@ -556,7 +556,8 @@ Original error: ${err.message}`),
 					return;
 				}
 
-				// Store the maximum sequence number (highest sequence in mailbox)
+				// box.messages.total is the highest sequence number, even if there are gaps
+				// This is exactly what we need for sequence-based fetching
 				const maxSequence = box.messages.total || 0;
 
 				// Search for ALL messages to get accurate count (handles deleted messages)

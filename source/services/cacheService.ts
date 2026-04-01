@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import {EmailMessage} from '../types/email.js';
-import {debugLog, LogLevel} from '../utils/debug.js';
+import {debugLog, LogLevel} from '../utils/debug-core.js';
 
 interface CachedMessage {
 	id: number;

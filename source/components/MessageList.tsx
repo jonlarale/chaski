@@ -509,8 +509,9 @@ const MessageList: React.FC<MessageListProps> = ({
 					maxSequenceNumber - (currentPage - 1) * messagesPerPage,
 				);
 
-				// Fetch 50% more messages to account for gaps
-				const bufferSize = Math.ceil(messagesPerPage * 1.5);
+				// Fetch 3x more messages to account for gaps from deleted messages
+				// This ensures we get enough messages even with significant gaps
+				const bufferSize = Math.ceil(messagesPerPage * 3);
 				const startSeq = Math.max(1, endSeq - bufferSize + 1);
 
 				// Ensure valid sequence range

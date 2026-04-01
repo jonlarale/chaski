@@ -1,18 +1,19 @@
+import process from 'node:process';
 import OpenAI from 'openai';
-import {EmailMessage} from '../types/email.js';
-import {
+import type {EmailMessage} from '../types/email.js';
+import type {
 	AssistantContextSnapshot,
 	AssistantMessage,
 	AssistantOptions,
 	AssistantResponse,
 } from '../types/assistant.js';
 
-const DEFAULT_MODEL = 'gpt-4o-mini';
-const DEFAULT_MAX_CONTEXT_MESSAGES = 12;
-const DEFAULT_HISTORY_LENGTH = 6;
+const defaultModel = 'gpt-4o-mini';
+const defaultMaxContextMessages = 12;
+const defaultHistoryLength = 6;
 
 export class AssistantService {
-	private client: OpenAI | null;
+	private readonly client: OpenAI | undefined;
 	private readonly model: string;
 	private readonly maxContextMessages: number;
 	private readonly maxHistory: number;
@@ -23,15 +24,15 @@ export class AssistantService {
 			process.env['OPENAI_KEY'] ??
 			process.env['OPENAI_TOKEN'];
 
-		this.client = apiKey ? new OpenAI({apiKey}) : null;
-		this.model = options.model ?? DEFAULT_MODEL;
+		this.client = apiKey ? new OpenAI({apiKey}) : undefined;
+		this.model = options.model ?? defaultModel;
 		this.maxContextMessages =
-			options.maxContextMessages ?? DEFAULT_MAX_CONTEXT_MESSAGES;
-		this.maxHistory = DEFAULT_HISTORY_LENGTH;
+			options.maxContextMessages ?? defaultMaxContextMessages;
+		this.maxHistory = defaultHistoryLength;
 	}
 
 	isEnabled(): boolean {
-		return this.client !== null;
+		return this.client !== undefined;
 	}
 
 	getModel(): string {
@@ -61,7 +62,7 @@ export class AssistantService {
 						`${email.accountId ?? 'unknown'}:${email.uid ?? 'unknown'}`,
 					subject: email.subject,
 					from,
-					preview: email.body?.text || email.body?.html || '',
+					preview: email.body?.text ?? email.body?.html ?? '',
 					date:
 						email.date instanceof Date
 							? email.date.toISOString()
@@ -73,42 +74,7 @@ export class AssistantService {
 		};
 	}
 
-	private buildContextText(snapshot: AssistantContextSnapshot): string {
-		if (!snapshot.messages.length) {
-			return 'No email messages are available in the context.';
-		}
-
-		const headerParts = [] as string[];
-		if (snapshot.account) headerParts.push(`Cuenta: ${snapshot.account}`);
-		if (snapshot.folder) headerParts.push(`Carpeta: ${snapshot.folder}`);
-
-		const header = headerParts.length
-			? `Context (${headerParts.join(' · ')}):`
-			: 'Message context:';
-
-		const messageSummaries = snapshot.messages.map((message, index) => {
-			const lines = [
-				`Message ${index + 1}:`,
-				message.subject ? `Subject: ${message.subject}` : null,
-				message.from ? `From: ${message.from}` : null,
-				message.date ? `Date: ${message.date}` : null,
-				message.preview ? `Preview: ${message.preview}` : null,
-			].filter(Boolean);
-			return lines.join('\n');
-		});
-
-		return `${header}\n\n${messageSummaries.join('\n\n')}`;
-	}
-
-	private selectHistory(history: AssistantMessage[]): AssistantMessage[] {
-		if (history.length <= this.maxHistory) {
-			return history;
-		}
-
-		return history.slice(history.length - this.maxHistory);
-	}
-
-	async createResponse(params: {
+	async createResponse(parameters: {
 		prompt: string;
 		history: AssistantMessage[];
 		context: AssistantContextSnapshot;
@@ -117,7 +83,7 @@ export class AssistantService {
 			throw new Error('OpenAI API key not configured.');
 		}
 
-		const {prompt, history, context} = params;
+		const {prompt, history, context} = parameters;
 		const trimmedHistory = this.selectHistory(history);
 
 		const systemMessage = `You are an assistant embedded in the Chaski mail client. Only answer using details provided in the email context. If the user question cannot be solved with that context, state that you do not have enough information. Mirror the user's language and never invent details.`;
@@ -140,8 +106,11 @@ export class AssistantService {
 			model: this.model,
 			messages,
 			temperature: 0.4,
+			// eslint-disable-next-line @typescript-eslint/naming-convention
 			max_tokens: 600,
+			// eslint-disable-next-line @typescript-eslint/naming-convention
 			presence_penalty: 0,
+			// eslint-disable-next-line @typescript-eslint/naming-convention
 			frequency_penalty: 0,
 		});
 
@@ -154,6 +123,42 @@ export class AssistantService {
 			reply,
 			usedMessages: context.messages,
 		};
+	}
+
+	private buildContextText(snapshot: AssistantContextSnapshot): string {
+		if (snapshot.messages.length === 0) {
+			return 'No email messages are available in the context.';
+		}
+
+		const headerParts = [] as string[];
+		if (snapshot.account) headerParts.push(`Cuenta: ${snapshot.account}`);
+		if (snapshot.folder) headerParts.push(`Carpeta: ${snapshot.folder}`);
+
+		const header =
+			headerParts.length > 0
+				? `Context (${headerParts.join(' · ')}):`
+				: 'Message context:';
+
+		const messageSummaries = snapshot.messages.map((message, index) => {
+			const lines = [
+				`Message ${index + 1}:`,
+				message.subject ? `Subject: ${message.subject}` : null,
+				message.from ? `From: ${message.from}` : null,
+				message.date ? `Date: ${message.date}` : null,
+				message.preview ? `Preview: ${message.preview}` : null,
+			].filter(Boolean);
+			return lines.join('\n');
+		});
+
+		return `${header}\n\n${messageSummaries.join('\n\n')}`;
+	}
+
+	private selectHistory(history: AssistantMessage[]): AssistantMessage[] {
+		if (history.length <= this.maxHistory) {
+			return history;
+		}
+
+		return history.slice(history.length - this.maxHistory);
 	}
 }
 

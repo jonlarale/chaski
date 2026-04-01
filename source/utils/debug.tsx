@@ -1,19 +1,21 @@
-import {useStderr} from 'ink';
-import {useEffect, useRef} from 'react';
-import React from 'react';
-import {Text, Box} from 'ink';
+import React, {useEffect, useRef} from 'react';
+import {Box, Text, useStderr} from 'ink';
+import {DEBUG_CONFIG, LogLevel, debugLog} from './debug-core.js';
 
 // Re-export everything from debug-core (no React/Ink dependencies)
 export {DEBUG_CONFIG, LogLevel, debugLog, closeDebugLog} from './debug-core.js';
-import {DEBUG_CONFIG, LogLevel, debugLog} from './debug-core.js';
 
 // Component-specific debug hook
 export function useDebug(componentName: string) {
-	const stderrRef = useRef<{write: (data: string) => void} | null>(null);
+	const stderrRef = useRef<{write: (data: string) => void} | undefined>(
+		undefined,
+	);
 
-	// Only use stderr hook if debug is enabled
+	// Always call useStderr unconditionally (Rules of Hooks)
+	const stderr = useStderr();
+
+	// Only use stderr if debug is enabled
 	if (DEBUG_CONFIG.enabled && DEBUG_CONFIG.useStderr) {
-		const stderr = useStderr();
 		stderrRef.current = stderr;
 	}
 
@@ -25,19 +27,24 @@ export function useDebug(componentName: string) {
 				debugLog(LogLevel.DEBUG, componentName, 'Component unmounted');
 			};
 		}
+
 		return undefined;
 	}, [componentName]);
 
 	return {
-		debug: (message: string, data?: any) =>
-			debugLog(LogLevel.DEBUG, componentName, message, data),
-		info: (message: string, data?: any) =>
-			debugLog(LogLevel.INFO, componentName, message, data),
-		warn: (message: string, data?: any) =>
-			debugLog(LogLevel.WARN, componentName, message, data),
-		error: (message: string, data?: any) =>
-			debugLog(LogLevel.ERROR, componentName, message, data),
-		writeStderr: (message: string) => {
+		debug(message: string, data?: unknown) {
+			debugLog(LogLevel.DEBUG, componentName, message, data);
+		},
+		info(message: string, data?: unknown) {
+			debugLog(LogLevel.INFO, componentName, message, data);
+		},
+		warn(message: string, data?: unknown) {
+			debugLog(LogLevel.WARN, componentName, message, data);
+		},
+		error(message: string, data?: unknown) {
+			debugLog(LogLevel.ERROR, componentName, message, data);
+		},
+		writeStderr(message: string) {
 			if (stderrRef.current) {
 				stderrRef.current.write(`[${componentName}] ${message}\n`);
 			}
@@ -46,7 +53,7 @@ export function useDebug(componentName: string) {
 }
 
 // Debug component for displaying debug status
-export const DebugStatus: React.FC = () => {
+export function DebugStatus() {
 	if (!DEBUG_CONFIG.enabled) return null;
 
 	return (
@@ -57,4 +64,4 @@ export const DebugStatus: React.FC = () => {
 			</Text>
 		</Box>
 	);
-};
+}

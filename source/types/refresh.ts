@@ -1,4 +1,4 @@
-export interface RefreshStatus {
+export type RefreshStatus = {
 	isRefreshing: boolean;
 	message?: string;
 	progress?: {
@@ -6,6 +6,6 @@ export interface RefreshStatus {
 		total: number;
 	};
 	error?: string;
-}
+};
 
 export type RefreshScope = 'current' | 'all' | 'inbox';

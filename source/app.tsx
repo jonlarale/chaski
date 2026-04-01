@@ -1,6 +1,12 @@
-// src/index.tsx
+// Src/index.tsx
+import type {Buffer} from 'node:buffer';
+import fs from 'node:fs';
+import path from 'node:path';
+import process from 'node:process';
 import React, {useState, useEffect} from 'react';
 import {Box, useApp, useInput, useStdout} from 'ink';
+import Gradient from 'ink-gradient';
+import BigText from 'ink-big-text';
 import FolderList from './components/FolderList.js';
 import MessageList from './components/MessageList.js';
 import CommandBar from './components/CommandBar.js';
@@ -18,24 +24,20 @@ import {SettingsService} from './services/settingsService.js';
 import {CacheService} from './services/cacheService.js';
 import {DownloadService} from './services/downloadService.js';
 import AssistantService from './services/assistantService.js';
-import {AssistantMessage, AssistantStatus} from './types/assistant.js';
-import {EmailAccount, EmailMessage} from './types/email.js';
-import {RefreshStatus} from './types/refresh.js';
-import fs from 'fs';
-import path from 'path';
-import Gradient from 'ink-gradient';
-import BigText from 'ink-big-text';
+import type {AssistantMessage, AssistantStatus} from './types/assistant.js';
+import type {EmailAccount, EmailMessage} from './types/email.js';
+import type {RefreshStatus} from './types/refresh.js';
 import {spacing} from './constants/index.js';
 
 // Debug logging function
-const debugLog = (component: string, message: string, data?: any) => {
+const debugLog = (component: string, message: string, data?: unknown) => {
 	const timestamp = new Date().toISOString();
 	const logEntry = `[${timestamp}] ${component}: ${message}${
 		data ? ` ${JSON.stringify(data)}` : ''
 	}\n`;
 	try {
 		fs.appendFileSync(path.join(process.cwd(), 'debug.log'), logEntry);
-	} catch (err) {
+	} catch {
 		// Fail silently if we can't write to log
 	}
 };
@@ -51,7 +53,7 @@ type ViewMode =
 	| 'removeAccount'
 	| 'settings';
 
-interface Message {
+type Message = {
 	id: string;
 	from: string;
 	subject: string;
@@ -70,57 +72,73 @@ interface Message {
 		contentId?: string;
 		content?: Buffer;
 	}>;
-	_original?: any; // Original EmailMessage data
-}
+	_original?: unknown; // Original EmailMessage data
+};
 
-const App = () => {
-	const [selectedFolder, setFolder] = useState('INBOX');
-	const [selectedAccount, setAccount] = useState<string | undefined>(undefined);
+function App() {
+	const [selectedFolder, setSelectedFolder] = useState('INBOX');
+	const [selectedAccount, setSelectedAccount] = useState<string | undefined>(
+		undefined,
+	);
 	const [focusedComponent, setFocusedComponent] =
 		useState<FocusedComponent>('folders');
 	const [viewMode, setViewMode] = useState<ViewMode>('main');
-	const [openedEmail, setOpenedEmail] = useState<Message | null>(null);
-	const [openedThread, setOpenedThread] = useState<Message | null>(null);
+	const [openedEmail, setOpenedEmail] = useState<Message | undefined>(
+		undefined,
+	);
+	const [openedThread, setOpenedThread] = useState<Message | undefined>(
+		undefined,
+	);
 	const [folderExpanded, setFolderExpanded] = useState(false); // To track if a folder is expanded
 	const [composeMode, setComposeMode] = useState<
 		'compose' | 'reply' | 'forward'
 	>('compose');
-	const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
+	const [replyToMessage, setReplyToMessage] = useState<Message | undefined>(
+		undefined,
+	);
 	const [lastUsedAccount, setLastUsedAccount] =
 		useState<string>('example@gmail.com');
 	const [commandInputActive, setCommandInputActive] = useState(false);
-	const [emailService] = useState(() => new EmailService());
-	const [settingsService] = useState(() => new SettingsService());
-	const [cacheService] = useState(() => new CacheService());
-	const [downloadService] = useState(() => new DownloadService());
+	const [emailService, setEmailService] = useState(() => new EmailService());
+	const [settingsService, setSettingsService] = useState(
+		() => new SettingsService(),
+	);
+	const [cacheService, setCacheService] = useState(() => new CacheService());
+	const [downloadService, setDownloadService] = useState(
+		() => new DownloadService(),
+	);
 	const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([]);
 	const [refreshStatus, setRefreshStatus] = useState<RefreshStatus>({
 		isRefreshing: false,
 	});
 	const [refreshTrigger, setRefreshTrigger] = useState(0);
-	const [assistantService] = useState(() => new AssistantService());
+	const [assistantService, setAssistantService] = useState(
+		() => new AssistantService(),
+	);
 	const [assistantMessages, setAssistantMessages] = useState<
 		AssistantMessage[]
 	>([]);
 	const [assistantStatus, setAssistantStatus] =
 		useState<AssistantStatus>('idle');
-	const [assistantError, setAssistantError] = useState<string | null>(null);
+	const [assistantError, setAssistantError] = useState<string | undefined>(
+		undefined,
+	);
 	const app = useApp();
 	const {stdout} = useStdout();
 
 	debugLog('App.tsx', 'useApp hook result', {
-		hasExit: !!app.exit,
-		app: Object.keys(app || {}),
+		hasExit: Boolean(app.exit),
+		app: Object.keys(app ?? {}),
 	});
 
 	const onQuit = () => {
 		debugLog('App.tsx onQuit', 'onQuit called, forcing immediate exit');
 		// Just exit immediately - Ink's app.exit() seems to not be working
-		process.exit(0);
+		process.exit(0); // eslint-disable-line unicorn/no-process-exit
 	};
 
 	// Calculate responsive folder width (30% with 25 char minimum)
-	const terminalWidth = stdout.columns || 80;
+	const terminalWidth = stdout.columns ?? 80;
 	const folderWidth = Math.max(
 		Math.floor(terminalWidth * spacing.folder.widthPercent),
 		spacing.folder.minWidth,
@@ -145,13 +163,19 @@ const App = () => {
 	});
 
 	const gatherAssistantContext = async () => {
+		const openedEmailOriginal = openedEmail?._original as
+			| EmailMessage
+			| undefined;
+		const openedThreadOriginal = openedThread?._original as
+			| EmailMessage
+			| undefined;
 		const folderCandidate =
-			openedEmail?._original?.folder ||
-			openedThread?._original?.folder ||
-			selectedFolder ||
+			openedEmailOriginal?.folder ??
+			openedThreadOriginal?.folder ??
+			selectedFolder ??
 			'INBOX';
 		const accountIdFromMessage =
-			openedEmail?._original?.accountId || openedThread?._original?.accountId;
+			openedEmailOriginal?.accountId ?? openedThreadOriginal?.accountId;
 		const accountFromMessage = accountIdFromMessage
 			? emailAccounts.find(acc => acc.id === accountIdFromMessage)
 			: undefined;
@@ -159,7 +183,7 @@ const App = () => {
 			? emailAccounts.find(acc => acc.email === selectedAccount)
 			: undefined;
 		const account =
-			accountFromMessage || accountFromSelection || emailAccounts[0];
+			accountFromMessage ?? accountFromSelection ?? emailAccounts[0];
 
 		if (!account) {
 			return assistantService.buildContextSnapshot([], {
@@ -177,27 +201,27 @@ const App = () => {
 				20,
 				0,
 			);
-		} catch (error) {
+		} catch (error: unknown) {
 			debugLog('App.tsx', 'Assistant cache lookup failed', {
 				error: error instanceof Error ? error.message : String(error),
 			});
 		}
 
-		if (!contextEmails.length) {
+		if (contextEmails.length === 0) {
 			try {
 				contextEmails = await emailService.getMessages(
 					account.id,
 					folderCandidate,
 					20,
 				);
-			} catch (error) {
+			} catch (error: unknown) {
 				debugLog('App.tsx', 'Assistant message fetch failed', {
 					error: error instanceof Error ? error.message : String(error),
 				});
 			}
 		}
 
-		const pinnedMessage = openedEmail?._original || openedThread?._original;
+		const pinnedMessage = openedEmailOriginal ?? openedThreadOriginal;
 		if (pinnedMessage) {
 			contextEmails = [
 				pinnedMessage,
@@ -221,15 +245,15 @@ const App = () => {
 		}
 
 		const userMessage = createAssistantMessage('user', question);
-		setAssistantMessages(prev => [...prev, userMessage]);
-		setAssistantError(null);
+		setAssistantMessages(previous => [...previous, userMessage]);
+		setAssistantError(undefined);
 
 		if (!assistantService.isEnabled()) {
 			const warning = createAssistantMessage(
 				'assistant',
 				'Set OPENAI_API_KEY in your .env file to enable the assistant.',
 			);
-			setAssistantMessages(prev => [...prev, warning]);
+			setAssistantMessages(previous => [...previous, warning]);
 			setAssistantStatus('error');
 			setAssistantError('OPENAI_API_KEY is not configured.');
 			return;
@@ -249,10 +273,10 @@ const App = () => {
 				'assistant',
 				response.reply,
 			);
-			setAssistantMessages(prev => [...prev, assistantMessage]);
+			setAssistantMessages(previous => [...previous, assistantMessage]);
 			setAssistantStatus('idle');
-			setAssistantError(null);
-		} catch (error) {
+			setAssistantError(undefined);
+		} catch (error: unknown) {
 			const message =
 				error instanceof Error
 					? error.message
@@ -261,7 +285,7 @@ const App = () => {
 				error: error instanceof Error ? error.message : String(error),
 			});
 			const fallback = createAssistantMessage('assistant', `⚠️ ${message}`);
-			setAssistantMessages(prev => [...prev, fallback]);
+			setAssistantMessages(previous => [...previous, fallback]);
 			setAssistantStatus('error');
 			setAssistantError(message);
 		}
@@ -327,7 +351,7 @@ const App = () => {
 		// Handle compose shortcut
 		if (input === 'c' || input === 'C') {
 			setComposeMode('compose');
-			setReplyToMessage(null);
+			setReplyToMessage(undefined);
 			setViewMode('compose');
 			return;
 		}
@@ -335,21 +359,17 @@ const App = () => {
 		// Only handle horizontal navigation between components when:
 		// 1. We're in folders and have a selected account (to go to messages)
 		// 2. We're in messages (to go back to folders)
-		if (key.rightArrow) {
-			// → only advances if we're in folders AND have a selected account
-			if (focusedComponent === 'folders' && selectedAccount) {
-				setFocusedComponent('messages');
-			}
+		// → only advances if we're in folders AND have a selected account
+		if (key.rightArrow && focusedComponent === 'folders' && selectedAccount) {
+			setFocusedComponent('messages');
 		}
 
-		if (key.leftArrow) {
-			// ← goes back from messages to folders
-			if (focusedComponent === 'messages') {
-				setFocusedComponent('folders');
-				// Clear account selection to return to accounts level
-				setAccount(undefined);
-				// Keep folderExpanded as true to show selection message
-			}
+		// ← goes back from messages to folders
+		if (key.leftArrow && focusedComponent === 'messages') {
+			setFocusedComponent('folders');
+			// Clear account selection to return to accounts level
+			setSelectedAccount(undefined);
+			// Keep folderExpanded as true to show selection message
 		}
 	});
 
@@ -357,13 +377,13 @@ const App = () => {
 		setFolderExpanded(expanded);
 		// If folder is collapsed, clear selected account
 		if (!expanded) {
-			setAccount(undefined);
+			setSelectedAccount(undefined);
 		}
 	};
 
 	const handleFolderSelect = (folder: string, account?: string) => {
-		setFolder(folder);
-		setAccount(account);
+		setSelectedFolder(folder);
+		setSelectedAccount(account);
 		// Only change focus to messages if a specific account was selected
 		if (account) {
 			setFocusedComponent('messages');
@@ -380,29 +400,32 @@ const App = () => {
 
 		// If the message has the original email data, mark it as read in the email service
 		if (message._original && selectedAccount) {
+			const originalMessage = message._original as EmailMessage;
 			const account = emailAccounts.find(acc => acc.email === selectedAccount);
-			if (account && message._original.uid) {
+
+			if (account && originalMessage.uid) {
 				try {
 					// Mark as read in the email service (this will update IMAP)
 					await emailService.markAsRead(
 						account.id,
 						selectedFolder,
-						message._original.uid,
+						originalMessage.uid,
 					);
 
 					// Update the cache to reflect the read status
-					const updatedFlags = [...(message._original.flags || [])];
+					const updatedFlags = [...(originalMessage.flags ?? [])];
 					if (!updatedFlags.includes('\\Seen')) {
 						updatedFlags.push('\\Seen');
 					}
+
 					await cacheService.updateMessageFlags(
-						message._original.id,
+						originalMessage.id,
 						selectedFolder,
 						account.id,
 						updatedFlags,
 					);
-				} catch (err) {
-					console.error('Failed to mark message as read:', err);
+				} catch (error: unknown) {
+					console.error('Failed to mark message as read:', error);
 				}
 			}
 		}
@@ -414,8 +437,8 @@ const App = () => {
 	};
 
 	const handleBackToMain = () => {
-		setOpenedEmail(null);
-		setOpenedThread(null);
+		setOpenedEmail(undefined);
+		setOpenedThread(undefined);
 		setViewMode('main');
 	};
 
@@ -427,18 +450,19 @@ const App = () => {
 		if (email.cc) {
 			console.log('CC:', email.cc);
 		}
+
 		console.log('Subject:', email.subject);
 		// Remember the account used for sending
 		setLastUsedAccount(email.from);
 		setViewMode('main');
 		setComposeMode('compose');
-		setReplyToMessage(null);
+		setReplyToMessage(undefined);
 	};
 
 	const handleComposeCancel = () => {
 		setViewMode('main');
 		setComposeMode('compose');
-		setReplyToMessage(null);
+		setReplyToMessage(undefined);
 	};
 
 	const handleReply = (message: Message) => {
@@ -449,6 +473,7 @@ const App = () => {
 		if (selectedAccount && availableAccounts.includes(selectedAccount)) {
 			setLastUsedAccount(selectedAccount);
 		}
+
 		setViewMode('compose');
 	};
 
@@ -459,6 +484,7 @@ const App = () => {
 		if (selectedAccount && availableAccounts.includes(selectedAccount)) {
 			setLastUsedAccount(selectedAccount);
 		}
+
 		setViewMode('compose');
 	};
 
@@ -490,7 +516,7 @@ const App = () => {
 					const cachedMessages = await cacheService.getCachedMessages(
 						selectedFolder,
 						account.id,
-						10000, // Get max 10000 cached messages to check UIDs
+						10_000, // Get max 10000 cached messages to check UIDs
 					);
 
 					// Get the total messages in the folder first
@@ -499,9 +525,8 @@ const App = () => {
 						selectedFolder,
 					);
 
-					const totalMessages = folderStatus.total;
-					const maxSequence = folderStatus.maxSequence;
-					let allMessages: any[] = [];
+					const {total: totalMessages, maxSequence} = folderStatus;
+					let allMessages: EmailMessage[] = [];
 
 					// Smart refresh strategy:
 					// 1. Check recent messages for any new ones
@@ -544,7 +569,7 @@ const App = () => {
 							);
 
 							// Trigger UI update to show first messages
-							setRefreshTrigger(prev => prev + 1);
+							setRefreshTrigger(previous => previous + 1);
 
 							// Now fetch the rest in batches
 							const remainingEnd = firstStartSeq - 1;
@@ -562,6 +587,7 @@ const App = () => {
 									const startSeq = Math.max(1, endSeq - regularBatchSize + 1);
 									const sequenceRange = `${startSeq}:${endSeq}`;
 
+									// eslint-disable-next-line no-await-in-loop
 									const batchMessages = await emailService.getMessages(
 										account.id,
 										selectedFolder,
@@ -569,7 +595,7 @@ const App = () => {
 										sequenceRange,
 									);
 
-									allMessages = allMessages.concat(batchMessages);
+									allMessages = [...allMessages, ...batchMessages];
 
 									// Update status to show progress
 									setRefreshStatus({
@@ -579,6 +605,7 @@ const App = () => {
 
 									// Periodically update cache
 									if (allMessages.length % 1000 === 0) {
+										// eslint-disable-next-line no-await-in-loop
 										await cacheService.updateMessages(
 											allMessages,
 											selectedFolder,
@@ -608,14 +635,15 @@ const App = () => {
 							);
 
 							// Filter out messages we already have by UID
-							const existingUIDs = new Set(
+							const existingUids = new Set(
 								cachedMessages
 									.map((m: EmailMessage) => m.uid)
 									.filter((uid): uid is number => uid !== undefined),
 							);
 
 							const newMessages = fetchedMessages.filter(
-								(msg: EmailMessage) => msg.uid && !existingUIDs.has(msg.uid),
+								(message: EmailMessage) =>
+									message.uid && !existingUids.has(message.uid),
 							);
 
 							if (newMessages.length > 0) {
@@ -623,22 +651,23 @@ const App = () => {
 								const uidMap = new Map<number, EmailMessage>();
 
 								// Add existing messages
-								cachedMessages.forEach((msg: EmailMessage) => {
-									if (msg.uid) uidMap.set(msg.uid, msg);
-								});
+								for (const message of cachedMessages) {
+									if (message.uid) uidMap.set(message.uid, message);
+								}
 
 								// Add new messages (will overwrite if UID exists)
-								fetchedMessages.forEach((msg: EmailMessage) => {
-									if (msg.uid) uidMap.set(msg.uid, msg);
-								});
+								for (const message of fetchedMessages) {
+									if (message.uid) uidMap.set(message.uid, message);
+								}
 
-								allMessages = Array.from(uidMap.values());
+								allMessages = [...uidMap.values()];
 							} else {
 								// No new messages, keep existing cache
 								allMessages = cachedMessages;
 							}
 						}
 					}
+
 					await cacheService.updateMessages(
 						allMessages,
 						selectedFolder,
@@ -649,27 +678,30 @@ const App = () => {
 						selectedFolder,
 						account.id,
 						allMessages.length,
-						allMessages.filter(msg => !msg.flags.includes('\\Seen')).length,
+						allMessages.filter(message => !message.flags.includes('\\Seen'))
+							.length,
 					);
 					setRefreshStatus({
 						isRefreshing: false,
 						message: `✓ Refreshed ${selectedFolder} (${allMessages.length} messages)`,
 					});
 					// Trigger refresh in MessageList
-					setRefreshTrigger(prev => prev + 1);
+					setRefreshTrigger(previous => previous + 1);
 				}
 			} else if (scope === 'inbox') {
 				// Quick refresh for inbox - only fetch recent messages
 				let totalNewMessages = 0;
 				for (const account of emailAccounts) {
 					// Get the current cached messages
+					// eslint-disable-next-line no-await-in-loop
 					const cachedMessages = await cacheService.getCachedMessages(
 						'INBOX',
 						account.id,
-						10000,
+						10_000,
 					);
 
 					// Get the folder status to know the current max sequence
+					// eslint-disable-next-line no-await-in-loop
 					const folderStatus = await emailService.getFolderStatus(
 						account.id,
 						'INBOX',
@@ -690,6 +722,7 @@ const App = () => {
 							message: `🔄 Checking ${account.email} inbox...`,
 						});
 
+						// eslint-disable-next-line no-await-in-loop
 						const fetchedMessages = await emailService.getMessages(
 							account.id,
 							'INBOX',
@@ -698,14 +731,15 @@ const App = () => {
 						);
 
 						// Filter out messages we already have by UID
-						const existingUIDs = new Set(
+						const existingUids = new Set(
 							cachedMessages
 								.map((m: EmailMessage) => m.uid)
 								.filter((uid): uid is number => uid !== undefined),
 						);
 
 						const newMessages = fetchedMessages.filter(
-							(msg: EmailMessage) => msg.uid && !existingUIDs.has(msg.uid),
+							(message: EmailMessage) =>
+								message.uid && !existingUids.has(message.uid),
 						);
 
 						if (newMessages.length > 0) {
@@ -713,17 +747,18 @@ const App = () => {
 							const uidMap = new Map<number, EmailMessage>();
 
 							// Add existing messages
-							cachedMessages.forEach((msg: EmailMessage) => {
-								if (msg.uid) uidMap.set(msg.uid, msg);
-							});
+							for (const message of cachedMessages) {
+								if (message.uid) uidMap.set(message.uid, message);
+							}
 
 							// Add new messages (will overwrite if UID exists)
-							fetchedMessages.forEach((msg: EmailMessage) => {
-								if (msg.uid) uidMap.set(msg.uid, msg);
-							});
+							for (const message of fetchedMessages) {
+								if (message.uid) uidMap.set(message.uid, message);
+							}
 
-							const allMessages = Array.from(uidMap.values());
+							const allMessages = [...uidMap.values()];
 
+							// eslint-disable-next-line no-await-in-loop
 							await cacheService.updateMessages(
 								allMessages,
 								'INBOX',
@@ -755,8 +790,9 @@ const App = () => {
 						message: `✓ Inbox is up to date`,
 					});
 				}
+
 				// Trigger refresh in MessageList
-				setRefreshTrigger(prev => prev + 1);
+				setRefreshTrigger(previous => previous + 1);
 			} else {
 				// Refresh all folders - this could take a while
 				setRefreshStatus({
@@ -769,7 +805,7 @@ const App = () => {
 			setTimeout(() => {
 				setRefreshStatus({isRefreshing: false});
 			}, 3000);
-		} catch (error) {
+		} catch (error: unknown) {
 			setRefreshStatus({
 				isRefreshing: false,
 				error: error instanceof Error ? error.message : 'Refresh failed',
@@ -783,12 +819,12 @@ const App = () => {
 	const handleCacheStatus = async () => {
 		try {
 			const stats = await cacheService.getCacheStats();
-			const sizeInMB = (stats.totalSize / 1024 / 1024).toFixed(2);
+			const sizeInMb = (stats.totalSize / 1024 / 1024).toFixed(2);
 			console.log(`📊 Cache Statistics:`);
 			console.log(`   Total messages: ${stats.totalMessages}`);
-			console.log(`   Cache size: ${sizeInMB} MB`);
-			console.log(`   Oldest entry: ${stats.oldestMessage || 'None'}`);
-		} catch (error) {
+			console.log(`   Cache size: ${sizeInMb} MB`);
+			console.log(`   Oldest entry: ${String(stats.oldestMessage ?? 'None')}`);
+		} catch (error: unknown) {
 			console.error('Failed to get cache stats:', error);
 		}
 	};
@@ -797,16 +833,17 @@ const App = () => {
 		try {
 			await cacheService.clearAllCache();
 			console.log('✓ Cache cleared successfully');
-		} catch (error) {
+		} catch (error: unknown) {
 			console.error('Failed to clear cache:', error);
 		}
 	};
 
 	const handleAutoRefreshToggle = () => {
 		const currentEnabled = settingsService.getAutoRefreshEnabled();
-		settingsService.setAutoRefreshEnabled(!currentEnabled);
-		console.log(`Auto-refresh ${!currentEnabled ? 'enabled' : 'disabled'}`);
-		if (!currentEnabled) {
+		const nextEnabled = !currentEnabled;
+		settingsService.setAutoRefreshEnabled(nextEnabled);
+		console.log(`Auto-refresh ${nextEnabled ? 'enabled' : 'disabled'}`);
+		if (nextEnabled) {
 			const interval = settingsService.getAutoRefreshInterval();
 			console.log(
 				`Messages will refresh automatically every ${interval} minutes`,
@@ -817,8 +854,8 @@ const App = () => {
 	const handleAutoRefreshInterval = (command: string) => {
 		const args = command.split(' ');
 		if (args.length > 1 && args[1]) {
-			const minutes = parseInt(args[1]);
-			if (!isNaN(minutes) && minutes >= 1 && minutes <= 60) {
+			const minutes = Number.parseInt(args[1], 10);
+			if (!Number.isNaN(minutes) && minutes >= 1 && minutes <= 60) {
 				settingsService.setAutoRefreshInterval(minutes);
 				console.log(`Auto-refresh interval set to ${minutes} minutes`);
 				if (settingsService.getAutoRefreshEnabled()) {
@@ -856,35 +893,47 @@ const App = () => {
 		});
 
 		switch (cmd) {
-			case '/quit':
+			case '/quit': {
 				onQuit();
 				break;
-			case '/compose':
+			}
+
+			case '/compose': {
 				setComposeMode('compose');
-				setReplyToMessage(null);
+				setReplyToMessage(undefined);
 				setViewMode('compose');
 				break;
-			case '/add-account':
+			}
+
+			case '/add-account': {
 				setViewMode('addAccount');
 				break;
+			}
+
 			case '/update-account':
-			case '/edit-account':
+			case '/edit-account': {
 				setViewMode('editAccount');
 				break;
-			case '/remove-account':
+			}
+
+			case '/remove-account': {
 				setViewMode('removeAccount');
 				break;
-			case '/settings':
+			}
+
+			case '/settings': {
 				setViewMode('settings');
 				break;
+			}
+
 			case '/setpage': {
 				const args = trimmedCommand.split(' ');
 				if (args.length > 1 && args[1]) {
-					const num = parseInt(args[1], 10);
-					if (!Number.isNaN(num) && num > 0 && num <= 100) {
-						settingsService.setMessagesPerPage(num);
+					const number_ = Number.parseInt(args[1], 10);
+					if (!Number.isNaN(number_) && number_ > 0 && number_ <= 100) {
+						settingsService.setMessagesPerPage(number_);
 						console.log(
-							`Messages per page set to ${num}. Restart to apply changes.`,
+							`Messages per page set to ${number_}. Restart to apply changes.`,
 						);
 					} else {
 						console.log('Usage: /setpage <number> (1-100)');
@@ -895,37 +944,55 @@ const App = () => {
 					);
 					console.log('Usage: /setpage <number> to change');
 				}
+
 				break;
 			}
+
 			case '/refresh':
 			case '/sync':
-			case '/r':
+			case '/r': {
 				await handleRefresh('current');
 				break;
-			case '/refresh-all':
+			}
+
+			case '/refresh-all': {
 				await handleRefresh('all');
 				break;
-			case '/refresh-inbox':
+			}
+
+			case '/refresh-inbox': {
 				await handleRefresh('inbox');
 				break;
-			case '/cache-status':
+			}
+
+			case '/cache-status': {
 				await handleCacheStatus();
 				break;
-			case '/cache-clear':
+			}
+
+			case '/cache-clear': {
 				await handleCacheClear();
 				break;
-			case '/auto-refresh':
+			}
+
+			case '/auto-refresh': {
 				handleAutoRefreshToggle();
 				break;
-			case '/auto-refresh-interval':
+			}
+
+			case '/auto-refresh-interval': {
 				handleAutoRefreshInterval(trimmedCommand);
 				break;
-			case '/assistant-clear':
+			}
+
+			case '/assistant-clear': {
 				setAssistantMessages([]);
 				setAssistantStatus('idle');
-				setAssistantError(null);
+				setAssistantError(undefined);
 				console.log('🤖 Assistant conversation reset');
 				break;
+			}
+
 			case '/download-path':
 			case '/set-download-path': {
 				const pathArgs = trimmedCommand.split(' ').slice(1);
@@ -939,13 +1006,16 @@ const App = () => {
 					);
 					console.log('Usage: /download-path <path>');
 				}
+
 				break;
 			}
+
 			case '/download': {
 				if (viewMode === 'email' && openedEmail) {
 					const downloadArgs = trimmedCommand.split(' ').slice(1);
 					if (downloadArgs.length > 0 && openedEmail.attachments) {
-						const attachmentIndex = parseInt(downloadArgs[0] || '0', 10) - 1;
+						const attachmentIndex =
+							Number.parseInt(downloadArgs[0] ?? '0', 10) - 1;
 						if (
 							attachmentIndex >= 0 &&
 							attachmentIndex < openedEmail.attachments.length
@@ -957,10 +1027,12 @@ const App = () => {
 								);
 								if (result.success) {
 									console.log(
-										`✅ Downloaded ${attachment.filename} to ${result.filePath}`,
+										`✅ Downloaded ${attachment.filename} to ${String(
+											result.filePath,
+										)}`,
 									);
 								} else {
-									console.log(`❌ Failed to download: ${result.error}`);
+									console.log(`❌ Failed to download: ${String(result.error)}`);
 								}
 							}
 						} else {
@@ -974,8 +1046,10 @@ const App = () => {
 						'ℹ️ This command only works when viewing an email with attachments',
 					);
 				}
+
 				break;
 			}
+
 			case '/download-all': {
 				if (viewMode === 'email' && openedEmail && openedEmail.attachments) {
 					const results = await downloadService.downloadMultipleAttachments(
@@ -991,6 +1065,7 @@ const App = () => {
 							} file(s) to ${downloadService.getDownloadPath()}`,
 						);
 					}
+
 					if (failed.length > 0) {
 						console.log(`⚠️ Failed to download ${failed.length} file(s)`);
 					}
@@ -999,12 +1074,16 @@ const App = () => {
 						'ℹ️ This command only works when viewing an email with attachments',
 					);
 				}
+
 				break;
 			}
-			case '/search':
+
+			case '/search': {
 				console.log('Search functionality not yet implemented');
 				break;
-			case '/help':
+			}
+
+			case '/help': {
 				console.log('Available commands:');
 				console.log('/compose - Compose new email');
 				console.log('/add-account - Add a new email account');
@@ -1028,26 +1107,32 @@ const App = () => {
 				console.log('/help - Show this help');
 				console.log('/quit - Exit the application');
 				break;
-			default:
+			}
+
+			default: {
 				console.log(`Unknown command: ${trimmedCommand}`);
+			}
 		}
 	};
 
-	const handleAddAccountComplete = async (account: EmailAccount | null) => {
+	const handleAddAccountComplete = async (
+		account: EmailAccount | undefined,
+	) => {
 		if (account) {
 			try {
 				await emailService.saveAccount(account);
 				const accounts = await emailService.getAccounts();
 				setEmailAccounts(accounts);
 				console.log(`Account ${account.email} added successfully!`);
-			} catch (error) {
+			} catch (error: unknown) {
 				console.error('Failed to add account:', error);
 			}
 		}
+
 		setViewMode('main');
 	};
 
-	const handleRemoveAccountComplete = async (accountId: string | null) => {
+	const handleRemoveAccountComplete = async (accountId: string | undefined) => {
 		if (accountId) {
 			try {
 				await emailService.removeAccount(accountId);
@@ -1056,98 +1141,113 @@ const App = () => {
 
 				// If we removed the currently selected account, reset selection
 				if (selectedAccount === accountId) {
-					setAccount(accounts.length > 0 ? accounts[0]?.id : undefined);
-					setFolder('INBOX');
+					setSelectedAccount(accounts.length > 0 ? accounts[0]?.id : undefined);
+					setSelectedFolder('INBOX');
 				}
 
 				console.log('Account removed successfully!');
-			} catch (error) {
+			} catch (error: unknown) {
 				console.error('Failed to remove account:', error);
 			}
 		}
+
 		setViewMode('main');
 	};
 
 	// Render according to view mode
 	switch (viewMode) {
-		case 'email':
+		case 'email': {
 			return openedEmail ? (
 				<EmailViewer
+					assistantError={assistantError}
+					assistantMessages={assistantMessages}
+					assistantStatus={assistantStatus}
+					downloadService={downloadService}
+					isCommandInputActive={commandInputActive}
 					message={openedEmail}
 					onBack={handleBackToMain}
-					onReply={handleReply}
-					onForward={handleForward}
-					commandInputActive={commandInputActive}
-					onCommandInputDeactivate={() => setCommandInputActive(false)}
 					onCommand={handleCommand}
-					downloadService={downloadService}
-					assistantMessages={assistantMessages}
-					assistantStatus={assistantStatus}
-					assistantError={assistantError}
+					onCommandInputDeactivate={() => {
+						setCommandInputActive(false);
+					}}
+					onForward={handleForward}
+					onReply={handleReply}
 				/>
 			) : null;
+		}
 
-		case 'thread':
+		case 'thread': {
 			return openedThread ? (
 				<ThreadViewer
-					originalMessage={openedThread}
-					onBack={handleBackToMain}
-					emailService={emailService}
-					emailAccounts={emailAccounts}
-					commandInputActive={commandInputActive}
-					onCommandInputDeactivate={() => setCommandInputActive(false)}
-					onCommand={handleCommand}
+					assistantError={assistantError}
 					assistantMessages={assistantMessages}
 					assistantStatus={assistantStatus}
-					assistantError={assistantError}
+					emailAccounts={emailAccounts}
+					emailService={emailService}
+					isCommandInputActive={commandInputActive}
+					originalMessage={openedThread}
+					onBack={handleBackToMain}
+					onCommand={handleCommand}
+					onCommandInputDeactivate={() => {
+						setCommandInputActive(false);
+					}}
 				/>
 			) : null;
+		}
 
-		case 'compose':
+		case 'compose': {
 			return (
 				<EmailComposer
-					onSend={handleComposeEmail}
-					onCancel={handleComposeCancel}
-					replyTo={replyToMessage || undefined}
-					mode={composeMode}
 					availableAccounts={availableAccounts}
 					defaultAccount={lastUsedAccount}
+					mode={composeMode}
+					replyTo={replyToMessage ?? undefined}
+					onCancel={handleComposeCancel}
+					onSend={handleComposeEmail}
 				/>
 			);
+		}
 
-		case 'addAccount':
+		case 'addAccount': {
 			return <AddAccountDialog onComplete={handleAddAccountComplete} />;
+		}
 
-		case 'editAccount':
+		case 'editAccount': {
 			return (
 				<EditAccountView
+					onCancel={() => {
+						setViewMode('main');
+					}}
 					onComplete={async () => {
 						setViewMode('main');
 						const accounts = await emailService.getAccounts();
 						setEmailAccounts(accounts);
 					}}
-					onCancel={() => setViewMode('main')}
 				/>
 			);
+		}
 
-		case 'removeAccount':
+		case 'removeAccount': {
 			return (
 				<RemoveAccountDialog
 					accounts={emailAccounts}
 					onComplete={handleRemoveAccountComplete}
 				/>
 			);
+		}
 
-		case 'settings':
+		case 'settings': {
 			return (
 				<SettingsDialog
 					settingsService={settingsService}
-					onClose={() => setViewMode('main')}
+					onClose={() => {
+						setViewMode('main');
+					}}
 				/>
 			);
+		}
 
-		case 'main':
-		default:
+		default: {
 			// Main view with folder list and messages
 			return (
 				<Box flexDirection="column" height="100%">
@@ -1157,51 +1257,50 @@ const App = () => {
 					<Box flexGrow={1}>
 						<Box width={folderWidth}>
 							<FolderList
-								onSelect={handleFolderSelect}
-								onExpand={handleFolderExpand}
-								hasFocus={focusedComponent === 'folders' && !commandInputActive}
-								selectedFolder={selectedFolder}
-								selectedAccount={selectedAccount}
-								width={folderWidth}
-								emailService={emailService}
 								emailAccounts={emailAccounts}
+								emailService={emailService}
+								hasFocus={focusedComponent === 'folders' && !commandInputActive}
+								selectedAccount={selectedAccount}
+								selectedFolder={selectedFolder}
+								width={folderWidth}
+								onExpand={handleFolderExpand}
+								onSelect={handleFolderSelect}
 							/>
 						</Box>
 						<Box flexGrow={1}>
 							<MessageList
-								folder={selectedFolder}
 								account={selectedAccount}
+								cacheService={cacheService}
+								emailAccounts={emailAccounts}
+								emailService={emailService}
+								folder={selectedFolder}
 								hasFocus={
 									focusedComponent === 'messages' && !commandInputActive
 								}
 								hasNavigated={folderExpanded}
-								onEmailOpen={handleEmailOpen}
-								onThreadOpen={handleThreadOpen}
-								emailService={emailService}
-								emailAccounts={emailAccounts}
-								settingsService={settingsService}
-								cacheService={cacheService}
 								refreshStatus={refreshStatus}
-								onRefreshRequest={handleRefresh}
 								refreshTrigger={refreshTrigger}
+								settingsService={settingsService}
+								onEmailOpen={handleEmailOpen}
+								onRefreshRequest={handleRefresh}
+								onThreadOpen={handleThreadOpen}
 							/>
 						</Box>
 					</Box>
 					<AssistantPanel
+						error={assistantError}
 						messages={assistantMessages}
 						status={assistantStatus}
-						error={assistantError}
 					/>
 
 					<CommandInput
 						isActive={commandInputActive}
-						onDeactivate={() => setCommandInputActive(false)}
 						onCommand={handleCommand}
+						onDeactivate={() => {
+							setCommandInputActive(false);
+						}}
 					/>
 					<CommandBar
-						onQuit={onQuit}
-						commandInputActive={commandInputActive}
-						view="main"
 						commands={[
 							{key: '↑↓', label: 'Navigate', action: 'navigate' as const},
 							{key: '←→', label: 'Select', action: 'select' as const},
@@ -1218,10 +1317,14 @@ const App = () => {
 							{key: 'C', label: 'Compose', action: 'secondary' as const},
 							{key: 'ESC', label: 'Quit', action: 'quit' as const},
 						]}
+						isCommandInputActive={commandInputActive}
+						view="main"
+						onQuit={onQuit}
 					/>
 				</Box>
 			);
+		}
 	}
-};
+}
 
 export default App;

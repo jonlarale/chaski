@@ -1,23 +1,23 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
 
-interface TextInputProps {
-	value: string;
-	onChange: (value: string) => void;
-	placeholder?: string;
-	focus?: boolean;
-	onSubmit?: () => void;
-	width?: number;
-}
+type TextInputProps = {
+	readonly value: string;
+	readonly onChange: (value: string) => void;
+	readonly placeholder?: string;
+	readonly isFocus?: boolean;
+	readonly onSubmit?: () => void;
+	readonly width?: number;
+};
 
-const TextInput: React.FC<TextInputProps> = ({
+function TextInput({
 	value,
 	onChange,
 	placeholder = '',
-	focus = false,
+	isFocus = false,
 	onSubmit,
 	width,
-}) => {
+}: TextInputProps) {
 	const [cursorPosition, setCursorPosition] = useState(value.length);
 
 	// Update cursor position when value changes externally
@@ -27,7 +27,7 @@ const TextInput: React.FC<TextInputProps> = ({
 
 	useInput(
 		(input, key) => {
-			if (!focus) return;
+			if (!isFocus) return;
 
 			// Handle backspace - always delete character before cursor
 			if (key.backspace) {
@@ -37,6 +37,7 @@ const TextInput: React.FC<TextInputProps> = ({
 					onChange(newValue);
 					setCursorPosition(cursorPosition - 1);
 				}
+
 				return;
 			}
 
@@ -54,28 +55,33 @@ const TextInput: React.FC<TextInputProps> = ({
 					onChange(newValue);
 					setCursorPosition(cursorPosition - 1);
 				}
+
 				return;
 			}
 
 			// Handle arrow keys
 			if (key.leftArrow) {
 				setCursorPosition(Math.max(0, cursorPosition - 1));
+
 				return;
 			}
+
 			if (key.rightArrow) {
 				setCursorPosition(Math.min(value.length, cursorPosition + 1));
+
 				return;
 			}
 
 			// Handle enter/return
 			if (key.return && onSubmit) {
 				onSubmit();
+
 				return;
 			}
 
 			// Handle character input
 			if (input && !key.ctrl && !key.meta && input.length === 1) {
-				const charCode = input.charCodeAt(0);
+				const charCode = input.codePointAt(0) ?? 0;
 
 				// Check for backspace character codes (fallback for terminals that don't set key flags)
 				if (charCode === 127 || charCode === 8) {
@@ -85,6 +91,7 @@ const TextInput: React.FC<TextInputProps> = ({
 						onChange(newValue);
 						setCursorPosition(cursorPosition - 1);
 					}
+
 					return;
 				}
 
@@ -99,7 +106,7 @@ const TextInput: React.FC<TextInputProps> = ({
 				}
 			}
 		},
-		{isActive: focus},
+		{isActive: isFocus},
 	);
 
 	// Display value with cursor
@@ -110,7 +117,7 @@ const TextInput: React.FC<TextInputProps> = ({
 	if (!value && placeholder) {
 		return (
 			<Box width={width}>
-				{focus && cursorPosition === 0 && (
+				{isFocus && cursorPosition === 0 && (
 					<Text backgroundColor="blue" color="blue">
 						│
 					</Text>
@@ -123,7 +130,7 @@ const TextInput: React.FC<TextInputProps> = ({
 	return (
 		<Box width={width}>
 			<Text color="white">{beforeCursor}</Text>
-			{focus && (
+			{isFocus && (
 				<Text backgroundColor="blue" color="blue">
 					│
 				</Text>
@@ -131,6 +138,6 @@ const TextInput: React.FC<TextInputProps> = ({
 			<Text color="white">{afterCursor}</Text>
 		</Box>
 	);
-};
+}
 
 export default TextInput;

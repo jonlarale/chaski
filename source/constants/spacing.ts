@@ -6,18 +6,18 @@ export const spacing = {
 	base: 1, // 1 character unit
 
 	// Padding
-	paddingXS: 0.5,
-	paddingSM: 1,
-	paddingMD: 1.5,
-	paddingLG: 2,
-	paddingXL: 2.5,
+	paddingXs: 0.5,
+	paddingSm: 1,
+	paddingMd: 1.5,
+	paddingLg: 2,
+	paddingXl: 2.5,
 
 	// Margins
-	marginXS: 0.5,
-	marginSM: 1,
-	marginMD: 1.5,
-	marginLG: 2,
-	marginXL: 2.5,
+	marginXs: 0.5,
+	marginSm: 1,
+	marginMd: 1.5,
+	marginLg: 2,
+	marginXl: 2.5,
 
 	// Component-specific spacing
 	message: {

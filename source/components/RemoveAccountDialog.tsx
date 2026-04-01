@@ -1,26 +1,22 @@
 import React, {useState} from 'react';
-import {Box, Text} from 'ink';
-import {useInput} from 'ink';
+import {Box, Text, useInput} from 'ink';
 import SelectInput from 'ink-select-input';
-import {EmailAccount} from '../types/email.js';
+import type {EmailAccount} from '../types/email.js';
 
-interface RemoveAccountDialogProps {
-	accounts: EmailAccount[];
-	onComplete: (accountId: string | null) => void;
-}
+type RemoveAccountDialogProps = {
+	readonly accounts: EmailAccount[];
+	readonly onComplete: (accountId: string | undefined) => void;
+};
 
-export const RemoveAccountDialog: React.FC<RemoveAccountDialogProps> = ({
-	accounts,
-	onComplete,
-}) => {
+function RemoveAccountDialog({accounts, onComplete}: RemoveAccountDialogProps) {
 	const [step, setStep] = useState<'select' | 'confirm'>('select');
-	const [selectedAccount, setSelectedAccount] = useState<EmailAccount | null>(
-		null,
-	);
+	const [selectedAccount, setSelectedAccount] = useState<
+		EmailAccount | undefined
+	>(undefined);
 
 	useInput((_input, key) => {
 		if (key.escape) {
-			onComplete(null);
+			onComplete(undefined);
 		}
 	});
 
@@ -46,7 +42,7 @@ export const RemoveAccountDialog: React.FC<RemoveAccountDialogProps> = ({
 		if (item.value === 'yes' && selectedAccount) {
 			onComplete(selectedAccount.id);
 		} else {
-			onComplete(null);
+			onComplete(undefined);
 		}
 	};
 
@@ -75,7 +71,10 @@ export const RemoveAccountDialog: React.FC<RemoveAccountDialogProps> = ({
 					<Box flexDirection="column">
 						<Text>Select account to remove:</Text>
 						<Box marginTop={1}>
-							<SelectInput items={accountItems} onSelect={handleAccountSelect} />
+							<SelectInput
+								items={accountItems}
+								onSelect={handleAccountSelect}
+							/>
 						</Box>
 					</Box>
 				)}
@@ -105,4 +104,6 @@ export const RemoveAccountDialog: React.FC<RemoveAccountDialogProps> = ({
 			</Box>
 		</Box>
 	);
-};
+}
+
+export {RemoveAccountDialog};

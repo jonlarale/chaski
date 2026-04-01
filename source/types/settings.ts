@@ -1,4 +1,4 @@
-export interface UserSettings {
+export type UserSettings = {
 	display: {
 		messagesPerPage: number;
 		foldersExpanded: boolean;
@@ -11,8 +11,9 @@ export interface UserSettings {
 		enabled: boolean;
 		intervalMinutes: number; // Interval in minutes between automatic refreshes
 	};
-}
+};
 
+// eslint-disable-next-line @typescript-eslint/naming-convention
 export const DEFAULT_SETTINGS: UserSettings = {
 	display: {
 		messagesPerPage: 20,

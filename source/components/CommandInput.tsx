@@ -1,24 +1,20 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
-import TextInput from './TextInput.js';
 import {colors, semanticColors, spacing} from '../constants/index.js';
+import TextInput from './TextInput.js';
 
-interface CommandInputProps {
-	isActive: boolean;
-	onDeactivate: () => void;
-	onCommand: (command: string) => void;
-}
+type CommandInputProps = {
+	readonly isActive: boolean;
+	readonly onDeactivate: () => void;
+	readonly onCommand: (command: string) => void;
+};
 
-interface Command {
+type Command = {
 	cmd: string;
 	desc: string;
-}
+};
 
-const CommandInput: React.FC<CommandInputProps> = ({
-	isActive,
-	onDeactivate,
-	onCommand,
-}) => {
+function CommandInput({isActive, onDeactivate, onCommand}: CommandInputProps) {
 	const [inputValue, setInputValue] = useState('');
 	const [showCommands, setShowCommands] = useState(false);
 	const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
@@ -63,6 +59,7 @@ const CommandInput: React.FC<CommandInputProps> = ({
 			setShowCommands(false);
 			setFilteredCommands([]);
 		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [inputValue]);
 
 	// Handle navigation keys when dropdown is shown
@@ -82,18 +79,21 @@ const CommandInput: React.FC<CommandInputProps> = ({
 			// Only handle navigation keys when dropdown is shown
 			if (showCommands && filteredCommands.length > 0) {
 				if (key.upArrow) {
-					setSelectedCommandIndex(prev =>
-						prev > 0 ? prev - 1 : filteredCommands.length - 1,
+					setSelectedCommandIndex(previous =>
+						previous > 0 ? previous - 1 : filteredCommands.length - 1,
 					);
 					return;
-				} else if (key.downArrow) {
-					setSelectedCommandIndex(prev =>
-						prev < filteredCommands.length - 1 ? prev + 1 : 0,
+				}
+
+				if (key.downArrow) {
+					setSelectedCommandIndex(previous =>
+						previous < filteredCommands.length - 1 ? previous + 1 : 0,
 					);
 					return;
-				} else if (key.return) {
+				}
+
+				if (key.return) {
 					// Let TextInput handle the return key
-					return;
 				}
 			}
 		},
@@ -132,39 +132,39 @@ const CommandInput: React.FC<CommandInputProps> = ({
 	};
 
 	return (
-		<Box width="100%" marginBottom={spacing.commandInput.margin}>
+		<Box marginBottom={spacing.commandInput.margin} width="100%">
 			<Box
-				width="100%"
-				flexDirection="column"
-				borderStyle="single"
 				borderColor={
 					isActive
 						? semanticColors.command.borderActive
 						: semanticColors.command.borderInactive
 				}
+				borderStyle="single"
+				flexDirection="column"
 				padding={0}
+				width="100%"
 			>
 				{/* Command dropdown */}
 				{showCommands && isActive && filteredCommands.length > 0 && (
 					<Box
-						width="100%"
 						flexDirection="column"
-						paddingX={spacing.commandInput.dropdownPadding}
-						paddingTop={spacing.commandInput.dropdownPadding}
 						paddingBottom={0}
+						paddingTop={spacing.commandInput.dropdownPadding}
+						paddingX={spacing.commandInput.dropdownPadding}
+						width="100%"
 					>
 						{filteredCommands.map((cmd, index) => (
-							<Box key={cmd.cmd} width="100%" marginBottom={0}>
+							<Box key={cmd.cmd} marginBottom={0} width="100%">
 								<Text
-									color={
-										index === selectedCommandIndex ? colors.white : colors.gray
-									}
 									backgroundColor={
 										index === selectedCommandIndex
 											? semanticColors.command.selected
 											: undefined
 									}
 									bold={index === selectedCommandIndex}
+									color={
+										index === selectedCommandIndex ? colors.white : colors.gray
+									}
 								>
 									{index === selectedCommandIndex ? '▶ ' : '  '}
 									{cmd.cmd}
@@ -173,34 +173,34 @@ const CommandInput: React.FC<CommandInputProps> = ({
 							</Box>
 						))}
 						<Box
+							marginBottom={spacing.marginSm}
+							marginTop={spacing.marginSm}
 							width="100%"
-							marginTop={spacing.marginSM}
-							marginBottom={spacing.marginSM}
 						>
 							<Text color={colors.darkGray}>
-								{'────────────────────────────────────────'}
+								────────────────────────────────────────
 							</Text>
 						</Box>
 					</Box>
 				)}
 
 				{/* Input box */}
-				<Box width="100%" paddingX={spacing.commandInput.padding}>
+				<Box paddingX={spacing.commandInput.padding} width="100%">
 					<Box flexDirection="row" width="100%">
 						<Text
-							color={isActive ? semanticColors.command.prompt : colors.gray}
 							bold
+							color={isActive ? semanticColors.command.prompt : colors.gray}
 						>
 							{'> '}
 						</Text>
 						{isActive ? (
 							<Box flexGrow={1}>
 								<TextInput
+									focus
+									placeholder="Ask about your mail or type / for commands..."
 									value={inputValue}
 									onChange={setInputValue}
 									onSubmit={handleSubmit}
-									placeholder="Ask about your mail or type / for commands..."
-									focus={true}
 								/>
 							</Box>
 						) : (
@@ -213,6 +213,6 @@ const CommandInput: React.FC<CommandInputProps> = ({
 			</Box>
 		</Box>
 	);
-};
+}
 
 export default CommandInput;

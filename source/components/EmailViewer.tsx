@@ -1,13 +1,14 @@
+import type {Buffer} from 'node:buffer';
 import React, {useState, useMemo, useEffect, useRef} from 'react';
 import {Box, Text, useInput, useStdout} from 'ink';
+import type {AssistantMessage, AssistantStatus} from '../types/assistant.js';
+import {DownloadService} from '../services/downloadService.js';
+import {colors, semanticColors, spacing} from '../constants/index.js';
+import AssistantPanel from './AssistantPanel.js';
 import CommandBar from './CommandBar.js';
 import CommandInput from './CommandInput.js';
-import AssistantPanel from './AssistantPanel.js';
-import {colors, semanticColors, spacing} from '../constants/index.js';
-import {DownloadService} from '../services/downloadService.js';
-import {AssistantMessage, AssistantStatus} from '../types/assistant.js';
 
-interface Message {
+type Message = {
 	id: string;
 	from: string;
 	subject: string;
@@ -25,40 +26,40 @@ interface Message {
 		contentId?: string;
 		content?: Buffer;
 	}>;
-}
+};
 
-interface EmailViewerProps {
-	message: Message;
-	onBack: () => void;
-	onReply?: (message: Message) => void;
-	onForward?: (message: Message) => void;
-	commandInputActive: boolean;
-	onCommandInputDeactivate: () => void;
-	onCommand: (command: string) => void;
-	downloadService?: DownloadService;
-	assistantMessages: AssistantMessage[];
-	assistantStatus: AssistantStatus;
-	assistantError?: string | null;
-}
+type EmailViewerProps = {
+	readonly message: Message;
+	readonly onBack: () => void;
+	readonly onReply?: (message: Message) => void;
+	readonly onForward?: (message: Message) => void;
+	readonly isCommandInputActive: boolean;
+	readonly onCommandInputDeactivate: () => void;
+	readonly onCommand: (command: string) => void;
+	readonly downloadService?: DownloadService;
+	readonly assistantMessages: AssistantMessage[];
+	readonly assistantStatus: AssistantStatus;
+	readonly assistantError?: string | undefined;
+};
 
-const EmailViewer: React.FC<EmailViewerProps> = ({
+function EmailViewer({
 	message,
 	onBack,
 	onReply,
 	onForward,
-	commandInputActive,
+	isCommandInputActive,
 	onCommandInputDeactivate,
 	onCommand,
 	downloadService,
 	assistantMessages,
 	assistantStatus,
 	assistantError,
-}) => {
+}: EmailViewerProps) {
 	const [scrollPosition, setScrollPosition] = useState(0);
 	const [scrollVelocity, setScrollVelocity] = useState(1);
 	const [downloadStatus, setDownloadStatus] = useState<string>('');
 	const [waitingForDownloadInput, setWaitingForDownloadInput] = useState(false);
-	const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const scrollTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 	const {write, stdout} = useStdout();
 
 	// Reset scroll position when message changes
@@ -70,11 +71,11 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 	// Clear screen when component mounts and unmounts
 	useEffect(() => {
 		// Clear screen on mount
-		write('\x1b[2J\x1b[H');
+		write('\u001B[2J\u001B[H');
 
 		return () => {
 			// Clear screen on unmount
-			write('\x1b[2J\x1b[H');
+			write('\u001B[2J\u001B[H');
 		};
 	}, [write]);
 
@@ -83,7 +84,9 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 		if (message.body?.text) {
 			// Use the text content if available
 			return message.body.text;
-		} else if (message.body?.html) {
+		}
+
+		if (message.body?.html) {
 			// If only HTML is available, strip HTML tags for basic display
 			// This is a simple implementation - a full HTML parser would be better
 			return message.body.html
@@ -96,10 +99,10 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 				.replace(/&#39;/g, "'")
 				.replace(/\s+/g, ' ') // Collapse multiple spaces
 				.trim();
-		} else {
-			// Fallback to preview if no body content is available
-			return message.preview || 'No content available';
 		}
+
+		// Fallback to preview if no body content is available
+		return message.preview || 'No content available';
 	}, [message.body, message.preview]);
 
 	// Split content into lines and wrap long lines
@@ -109,18 +112,18 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 		const lines = fullContent.split('\n');
 		const wrappedLines: string[] = [];
 
-		lines.forEach(line => {
+		for (const line of lines) {
 			if (line.length <= contentWidth) {
 				wrappedLines.push(line);
 			} else {
 				// Wrap long lines
 				let remaining = line;
 				while (remaining.length > 0) {
-					wrappedLines.push(remaining.substring(0, contentWidth));
-					remaining = remaining.substring(contentWidth);
+					wrappedLines.push(remaining.slice(0, contentWidth));
+					remaining = remaining.slice(contentWidth);
 				}
 			}
-		});
+		}
 
 		return wrappedLines;
 	}, [fullContent, stdout.columns]);
@@ -160,7 +163,7 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 		}
 
 		// Increase velocity for continuous scrolling
-		setScrollVelocity(prev => Math.min(prev + 0.5, 3));
+		setScrollVelocity(previous => Math.min(previous + 0.5, 3));
 
 		// Reset velocity after inactivity
 		scrollTimeoutRef.current = setTimeout(() => {
@@ -170,51 +173,135 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 
 	useInput(async (input, key) => {
 		// If command input is active, don't handle navigation keys
-		if (commandInputActive) return;
+		if (isCommandInputActive) return;
 
+		// Handle key-based navigation first
 		if (key.upArrow && !key.shift) {
 			handleScroll('up');
-		} else if (key.downArrow && !key.shift) {
+			return;
+		}
+
+		if (key.downArrow && !key.shift) {
 			handleScroll('down');
-		} else if (key.upArrow && key.shift) {
-			// Shift + ↑: ir al inicio
+			return;
+		}
+
+		if (key.upArrow && key.shift) {
+			// Shift + ↑: go to top
 			setScrollPosition(0);
 			setScrollVelocity(1);
-		} else if (key.downArrow && key.shift) {
-			// Shift + ↓: ir al final
+			return;
+		}
+
+		if (key.downArrow && key.shift) {
+			// Shift + ↓: go to bottom
 			setScrollPosition(maxScrollPosition);
 			setScrollVelocity(1);
-		} else if (key.pageUp) {
+			return;
+		}
+
+		if (key.pageUp) {
 			// Page Up: fast scroll up
 			setScrollPosition(Math.max(0, scrollPosition - 10));
 			setScrollVelocity(1);
-		} else if (key.pageDown) {
+			return;
+		}
+
+		if (key.pageDown) {
 			// Page Down: fast scroll down
 			setScrollPosition(Math.min(maxScrollPosition, scrollPosition + 10));
 			setScrollVelocity(1);
-		} else if (key.escape || key.leftArrow) {
+			return;
+		}
+
+		if (key.escape || key.leftArrow) {
 			// ESC or ← to go back
 			onBack();
-		} else if ((input === 'r' || input === 'R') && onReply) {
-			// R to reply
-			onReply(message);
-		} else if ((input === 'f' || input === 'F') && onForward) {
-			// F to forward
-			onForward(message);
-		} else if (input === 'g') {
-			// g to go to top (vim style)
-			setScrollPosition(0);
-			setScrollVelocity(1);
-		} else if (input === 'G') {
-			// G to go to bottom (vim style)
-			setScrollPosition(maxScrollPosition);
-			setScrollVelocity(1);
-		} else if (input === 'd' || input === 'D') {
-			// 'd' to start download mode
-			if (message.attachments && message.attachments.length > 0) {
-				if (input === 'D') {
-					// Download all attachments
-					if (downloadService) {
+			return;
+		}
+
+		// Handle download number input when waiting
+		if (waitingForDownloadInput) {
+			if (/^\d$/.test(input)) {
+				// Handle attachment number input
+				const attachmentIndex = Number.parseInt(input, 10) - 1;
+				if (
+					message.attachments &&
+					attachmentIndex >= 0 &&
+					attachmentIndex < message.attachments.length
+				) {
+					const attachment = message.attachments[attachmentIndex];
+
+					if (downloadService && attachment) {
+						const result = await downloadService.downloadAttachment(attachment);
+						if (result.success) {
+							setDownloadStatus(
+								`✅ Downloaded ${attachment.filename ?? ''} to ${
+									result.filePath ?? ''
+								}`,
+							);
+						} else {
+							setDownloadStatus(`❌ Failed to download: ${result.error ?? ''}`);
+						}
+					} else {
+						setDownloadStatus('❌ Download service not available');
+					}
+
+					// Clear status after 3 seconds
+					setTimeout(() => {
+						setDownloadStatus('');
+					}, 3000);
+				} else {
+					setDownloadStatus('❌ Invalid attachment number');
+					setTimeout(() => {
+						setDownloadStatus('');
+					}, 2000);
+				}
+
+				setWaitingForDownloadInput(false);
+			} else if (key.escape || key.return) {
+				// Cancel download mode
+				setWaitingForDownloadInput(false);
+				setDownloadStatus('');
+			}
+
+			return;
+		}
+
+		// Handle character input
+		switch (input) {
+			case 'r':
+			case 'R': {
+				if (onReply) onReply(message);
+				break;
+			}
+
+			case 'f':
+			case 'F': {
+				if (onForward) onForward(message);
+				break;
+			}
+
+			case 'g': {
+				// Go to top (vim style)
+				setScrollPosition(0);
+				setScrollVelocity(1);
+				break;
+			}
+
+			case 'G': {
+				// Go to bottom (vim style)
+				setScrollPosition(maxScrollPosition);
+				setScrollVelocity(1);
+				break;
+			}
+
+			case 'd':
+			case 'D': {
+				// 'd' to start download mode
+				if (message.attachments && message.attachments.length > 0) {
+					if (input === 'D' && downloadService) {
+						// Download all attachments
 						const results = await downloadService.downloadMultipleAttachments(
 							message.attachments,
 						);
@@ -228,6 +315,7 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 								} file(s) to ${downloadService.getDownloadPath()}`,
 							);
 						}
+
 						if (failed.length > 0) {
 							setDownloadStatus(
 								`⚠️ Failed to download ${failed.length} file(s)`,
@@ -235,53 +323,26 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 						}
 
 						// Clear status after 3 seconds
-						setTimeout(() => setDownloadStatus(''), 3000);
-					}
-				} else {
-					// Wait for number input
-					setWaitingForDownloadInput(true);
-					setDownloadStatus(
-						'📥 Enter attachment number to download (1-' +
-							message.attachments.length +
-							')',
-					);
-				}
-			}
-		} else if (waitingForDownloadInput && /^[0-9]$/.test(input)) {
-			// Handle attachment number input
-			const attachmentIndex = parseInt(input, 10) - 1;
-			if (
-				message.attachments &&
-				attachmentIndex >= 0 &&
-				attachmentIndex < message.attachments.length
-			) {
-				const attachment = message.attachments[attachmentIndex];
-
-				if (downloadService && attachment) {
-					const result = await downloadService.downloadAttachment(attachment);
-					if (result.success) {
+						setTimeout(() => {
+							setDownloadStatus('');
+						}, 3000);
+					} else if (input === 'd') {
+						// Wait for number input
+						setWaitingForDownloadInput(true);
 						setDownloadStatus(
-							`✅ Downloaded ${attachment.filename} to ${result.filePath}`,
+							`📥 Enter attachment number to download (1-${String(
+								message.attachments.length,
+							)})`,
 						);
-					} else {
-						setDownloadStatus(`❌ Failed to download: ${result.error}`);
 					}
-				} else {
-					setDownloadStatus('❌ Download service not available');
 				}
 
-				// Clear status after 3 seconds
-				setTimeout(() => setDownloadStatus(''), 3000);
-			} else {
-				setDownloadStatus('❌ Invalid attachment number');
-				setTimeout(() => setDownloadStatus(''), 2000);
+				break;
 			}
 
-			setWaitingForDownloadInput(false);
-		} else if (waitingForDownloadInput && (key.escape || key.return)) {
-			// Cancel download mode
-			setWaitingForDownloadInput(false);
-			setDownloadStatus('');
+			default: {
+				break;
+			}
 		}
 	});
 
@@ -304,14 +365,14 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 			{/* Fixed Header */}
 			<Box flexDirection="column">
 				<Box
-					borderStyle="single"
-					borderBottom={true}
-					borderTop={false}
+					borderBottom
 					borderLeft={false}
 					borderRight={false}
-					paddingX={spacing.emailViewer.headerPadding}
-					paddingTop={spacing.emailViewer.headerPadding}
+					borderStyle="single"
+					borderTop={false}
 					paddingBottom={0}
+					paddingTop={spacing.emailViewer.headerPadding}
+					paddingX={spacing.emailViewer.headerPadding}
 				>
 					<Box flexDirection="column" width="100%">
 						<Box justifyContent="space-between">
@@ -325,14 +386,14 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 								Subject: {message.subject}
 							</Text>
 						</Box>
-						<Box marginTop={1} flexDirection="row">
+						<Box flexDirection="row" marginTop={1}>
 							<Text color={colors.gray}>From: </Text>
 							<Text color={semanticColors.email.from}>{message.from}</Text>
 							<Text color={colors.gray}> | Date: </Text>
 							<Text color={semanticColors.email.date}>{message.date}</Text>
 						</Box>
 						{/* Progress indicator */}
-						<Box marginTop={1} marginBottom={1} flexDirection="row">
+						<Box flexDirection="row" marginBottom={1} marginTop={1}>
 							<Text color={semanticColors.email.progressIndicator}>
 								Lines {scrollPosition + 1}-
 								{Math.min(
@@ -355,7 +416,7 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 						justifyContent="center"
 						paddingY={spacing.emailViewer.scrollIndicatorPadding}
 					>
-						<Text color={semanticColors.email.scrollIndicator} dimColor>
+						<Text dimColor color={semanticColors.email.scrollIndicator}>
 							▲ {scrollPosition} more line{scrollPosition > 1 ? 's' : ''} above
 							▲
 						</Text>
@@ -365,11 +426,12 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 				{/* Content */}
 				<Box
 					flexDirection="column"
-					paddingX={spacing.emailViewer.contentPadding}
 					flexGrow={1}
+					paddingX={spacing.emailViewer.contentPadding}
 				>
 					{visibleLines.map((line, index) => (
 						<Text
+							// eslint-disable-next-line react/no-array-index-key
 							key={scrollPosition + index}
 							color={semanticColors.email.content}
 						>
@@ -380,29 +442,31 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 					{/* Attachments Section */}
 					{message.attachments && message.attachments.length > 0 && (
 						<Box
+							borderColor="gray"
+							borderStyle="round"
 							flexDirection="column"
 							marginTop={2}
-							borderStyle="round"
-							borderColor="gray"
 							padding={1}
 						>
 							<Text bold color="yellow">
 								📎 Attachments ({message.attachments.length})
 							</Text>
 							{message.attachments.map((attachment, index) => (
+								// eslint-disable-next-line react/no-array-index-key
 								<Box key={index} marginTop={1}>
 									<Text color="cyan">
 										{index + 1}. {attachment.filename}
 									</Text>
-									<Text color="gray" dimColor>
+									<Text dimColor color="gray">
 										{DownloadService.formatFileSize(attachment.size)} •{' '}
 										{attachment.contentType}
 									</Text>
 								</Box>
 							))}
 							<Box marginTop={1}>
-								<Text color="gray" italic>
-									Press 'd' + number to download • 'D' to download all
+								<Text italic color="gray">
+									Press &apos;d&apos; + number to download • &apos;D&apos; to
+									download all
 								</Text>
 							</Box>
 						</Box>
@@ -432,7 +496,7 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 						justifyContent="center"
 						paddingY={spacing.emailViewer.scrollIndicatorPadding}
 					>
-						<Text color={semanticColors.email.scrollIndicator} dimColor>
+						<Text dimColor color={semanticColors.email.scrollIndicator}>
 							▼ {contentLines.length - scrollPosition - maxVisibleLines} more
 							line
 							{contentLines.length - scrollPosition - maxVisibleLines > 1
@@ -447,22 +511,21 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 			{/* Command Input */}
 			<Box flexDirection="column" width="100%">
 				<AssistantPanel
+					error={assistantError}
 					messages={assistantMessages}
 					status={assistantStatus}
-					error={assistantError}
 				/>
 				<CommandInput
-					isActive={commandInputActive}
-					onDeactivate={onCommandInputDeactivate}
+					isActive={isCommandInputActive}
 					onCommand={onCommand}
+					onDeactivate={onCommandInputDeactivate}
 				/>
 			</Box>
 
 			{/* Fixed Footer */}
 			<CommandBar
-				onQuit={onBack}
+				isCommandInputActive={isCommandInputActive}
 				view="email"
-				commandInputActive={commandInputActive}
 				commands={[
 					{key: '↑↓', label: 'Scroll', action: 'navigate'},
 					{key: 'Shift+↑↓', label: 'Jump', action: 'select'},
@@ -476,6 +539,6 @@ const EmailViewer: React.FC<EmailViewerProps> = ({
 			/>
 		</Box>
 	);
-};
+}
 
 export default EmailViewer;

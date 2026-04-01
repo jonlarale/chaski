@@ -79,7 +79,8 @@
 		],
 		"rules": {
 			"react/prop-types": "off",
-			"unicorn/expiring-todo-comments": "off"
+			"unicorn/expiring-todo-comments": "off",
+			"unicorn/filename-case": "off"
 		}
 	},
 	"prettier": "@vdemedes/prettier-config"

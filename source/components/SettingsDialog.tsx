@@ -1,23 +1,23 @@
 import React, {useState} from 'react';
-import {Box, Text} from 'ink';
-import {useInput} from 'ink';
+import {Box, Text, useInput} from 'ink';
 import TextInput from 'ink-text-input';
 import SelectInput from 'ink-select-input';
-import {SettingsService} from '../services/settingsService.js';
+import type {SettingsService} from '../services/settingsService.js';
 
-interface SettingsDialogProps {
-	settingsService: SettingsService;
-	onClose: () => void;
-}
+type SettingsDialogProps = {
+	readonly settingsService: SettingsService;
+	readonly onClose: () => void;
+};
 
 type SettingCategory = 'display' | 'shortcuts';
 
-export const SettingsDialog: React.FC<SettingsDialogProps> = ({
-	settingsService,
-	onClose,
-}) => {
-	const [category, setCategory] = useState<SettingCategory | null>(null);
-	const [selectedSetting, setSelectedSetting] = useState<string | null>(null);
+function SettingsDialog({settingsService, onClose}: SettingsDialogProps) {
+	const [category, setCategory] = useState<SettingCategory | undefined>(
+		undefined,
+	);
+	const [selectedSetting, setSelectedSetting] = useState<string | undefined>(
+		undefined,
+	);
 	const [inputValue, setInputValue] = useState('');
 	const settings = settingsService.getSettings();
 
@@ -50,6 +50,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 			// Shortcuts not implemented yet
 			return;
 		}
+
 		setCategory(item.value as SettingCategory);
 	};
 
@@ -61,18 +62,18 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 	};
 
 	const handleMessagesPerPageSubmit = (value: string) => {
-		const num = parseInt(value, 10);
-		if (isNaN(num) || num < 1 || num > 100) {
+		const number_ = Number.parseInt(value, 10);
+		if (Number.isNaN(number_) || number_ < 1 || number_ > 100) {
 			console.log('Please enter a number between 1 and 100');
 			return;
 		}
 
 		try {
-			settingsService.setMessagesPerPage(num);
-			console.log(`Messages per page set to ${num}`);
-			setSelectedSetting(null);
-			setCategory(null);
-		} catch (error) {
+			settingsService.setMessagesPerPage(number_);
+			console.log(`Messages per page set to ${number_}`);
+			setSelectedSetting(undefined);
+			setCategory(undefined);
+		} catch (error: unknown) {
 			console.error('Failed to update setting:', error);
 		}
 	};
@@ -82,9 +83,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 		try {
 			settingsService.setFoldersExpanded(value);
 			console.log(`Folders expanded by default: ${value ? 'Yes' : 'No'}`);
-			setSelectedSetting(null);
-			setCategory(null);
-		} catch (error) {
+			setSelectedSetting(undefined);
+			setCategory(undefined);
+		} catch (error: unknown) {
 			console.error('Failed to update setting:', error);
 		}
 	};
@@ -151,4 +152,6 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 			</Box>
 		</Box>
 	);
-};
+}
+
+export {SettingsDialog};

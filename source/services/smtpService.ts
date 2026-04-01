@@ -1,9 +1,10 @@
+import type {Buffer} from 'node:buffer';
 import nodemailer from 'nodemailer';
-import {EmailAccount} from '../types/email.js';
+import type {EmailAccount} from '../types/email.js';
 import {OAuth2Service} from './oauth2Service.js';
 import {AccountStorageService} from './accountStorageService.js';
 
-export interface SendMailOptions {
+export type SendMailOptions = {
 	from?: string;
 	to: string | string[];
 	cc?: string | string[];
@@ -19,19 +20,19 @@ export interface SendMailOptions {
 	}>;
 	inReplyTo?: string;
 	references?: string | string[];
-}
+};
 
 export class SmtpService {
-	private transporter: nodemailer.Transporter | null = null;
-	private oauth2Service = new OAuth2Service();
-	private accountStorage = new AccountStorageService();
+	private transporter: nodemailer.Transporter | undefined = undefined;
+	private readonly oauth2Service = new OAuth2Service();
+	private readonly accountStorage = new AccountStorageService();
 
 	async connect(account: EmailAccount): Promise<void> {
 		let transportOptions: any;
 
 		if (account.authType === 'oauth2' && account.oauth2Config) {
 			// Get fresh access token
-			let accessToken = account.oauth2Config.accessToken || '';
+			let accessToken = account.oauth2Config.accessToken ?? '';
 
 			// Check if token needs refresh
 			if (
@@ -53,11 +54,11 @@ export class SmtpService {
 
 			const service = account.provider === 'gmail' ? 'gmail' : undefined;
 			const host =
-				account.smtpConfig?.host ||
+				account.smtpConfig?.host ??
 				(account.provider === 'gmail'
 					? 'smtp.gmail.com'
 					: 'smtp.office365.com');
-			const port = account.smtpConfig?.port || 587;
+			const port = account.smtpConfig?.port ?? 587;
 
 			transportOptions = {
 				service,
@@ -79,8 +80,8 @@ export class SmtpService {
 				port: account.smtpConfig.port,
 				secure: account.smtpConfig.secure,
 				auth: {
-					user: account.smtpConfig.username || account.email,
-					pass: account.smtpConfig.password || '',
+					user: account.smtpConfig.username ?? account.email,
+					pass: account.smtpConfig.password ?? '',
 				},
 			};
 		} else {
@@ -123,14 +124,16 @@ export class SmtpService {
 				: undefined,
 		};
 
-		const info = await this.transporter.sendMail(mailOptions);
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+		const info: any = await this.transporter.sendMail(mailOptions);
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-return
 		return info.messageId;
 	}
 
 	async disconnect(): Promise<void> {
 		if (this.transporter) {
 			this.transporter.close();
-			this.transporter = null;
+			this.transporter = undefined;
 		}
 	}
 }

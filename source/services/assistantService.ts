@@ -8,7 +8,7 @@ import type {
 	AssistantResponse,
 } from '../types/assistant.js';
 
-const defaultModel = 'gpt-4o-mini';
+const defaultModel = process.env['OPENAI_MODEL'] ?? 'gpt-4o-mini';
 const defaultMaxContextMessages = 12;
 const defaultHistoryLength = 6;
 

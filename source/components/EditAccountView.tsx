@@ -1,35 +1,32 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
-import {EmailAccount} from '../types/email.js';
-import {AccountStorageService} from '../services/accountStorageService.js';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
+import type {EmailAccount} from '../types/email.js';
+import {AccountStorageService} from '../services/accountStorageService.js';
 
-interface EditAccountViewProps {
-	onComplete: () => void;
-	onCancel: () => void;
-}
+type EditAccountViewProps = {
+	readonly onComplete: () => void;
+	readonly onCancel: () => void;
+};
 
-export const EditAccountView: React.FC<EditAccountViewProps> = ({
-	onComplete,
-	onCancel,
-}) => {
+function EditAccountView({onComplete, onCancel}: EditAccountViewProps) {
 	useInput((_, key) => {
 		if (key.escape) {
 			onCancel();
 		}
 	});
 	const [accounts, setAccounts] = useState<EmailAccount[]>([]);
-	const [selectedAccount, setSelectedAccount] = useState<EmailAccount | null>(
-		null,
-	);
+	const [selectedAccount, setSelectedAccount] = useState<
+		EmailAccount | undefined
+	>(undefined);
 	const [editField, setEditField] = useState<string>('');
 	const [newValue, setNewValue] = useState<string>('');
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string>('');
 
 	useEffect(() => {
-		loadAccounts();
+		void loadAccounts();
 	}, []);
 
 	const loadAccounts = async () => {
@@ -56,22 +53,37 @@ export const EditAccountView: React.FC<EditAccountViewProps> = ({
 		if (!selectedAccount) return '';
 
 		switch (field) {
-			case 'email':
+			case 'email': {
 				return selectedAccount.email;
-			case 'displayName':
-				return selectedAccount.displayName || '';
-			case 'imapHost':
-				return selectedAccount.imapConfig?.host || '';
-			case 'imapPort':
-				return selectedAccount.imapConfig?.port?.toString() || '';
-			case 'imapUsername':
-				return selectedAccount.imapConfig?.username || '';
-			case 'smtpHost':
-				return selectedAccount.smtpConfig?.host || '';
-			case 'smtpPort':
-				return selectedAccount.smtpConfig?.port?.toString() || '';
-			default:
+			}
+
+			case 'displayName': {
+				return selectedAccount.displayName ?? '';
+			}
+
+			case 'imapHost': {
+				return selectedAccount.imapConfig?.host ?? '';
+			}
+
+			case 'imapPort': {
+				return selectedAccount.imapConfig?.port?.toString() ?? '';
+			}
+
+			case 'imapUsername': {
+				return selectedAccount.imapConfig?.username ?? '';
+			}
+
+			case 'smtpHost': {
+				return selectedAccount.smtpConfig?.host ?? '';
+			}
+
+			case 'smtpPort': {
+				return selectedAccount.smtpConfig?.port?.toString() ?? '';
+			}
+
+			default: {
 				return '';
+			}
 		}
 	};
 
@@ -83,43 +95,69 @@ export const EditAccountView: React.FC<EditAccountViewProps> = ({
 			const updatedAccount = {...selectedAccount};
 
 			switch (editField) {
-				case 'email':
+				case 'email': {
 					updatedAccount.email = newValue;
+
 					break;
-				case 'displayName':
+				}
+
+				case 'displayName': {
 					updatedAccount.displayName = newValue;
+
 					break;
-				case 'imapHost':
+				}
+
+				case 'imapHost': {
 					if (updatedAccount.imapConfig) {
 						updatedAccount.imapConfig.host = newValue;
 					}
+
 					break;
-				case 'imapPort':
+				}
+
+				case 'imapPort': {
 					if (updatedAccount.imapConfig) {
-						updatedAccount.imapConfig.port = parseInt(newValue, 10);
+						updatedAccount.imapConfig.port = Number.parseInt(newValue, 10);
 					}
+
 					break;
-				case 'imapUsername':
+				}
+
+				case 'imapUsername': {
 					if (updatedAccount.imapConfig) {
 						updatedAccount.imapConfig.username = newValue;
 					}
+
 					break;
-				case 'smtpHost':
+				}
+
+				case 'smtpHost': {
 					if (updatedAccount.smtpConfig) {
 						updatedAccount.smtpConfig.host = newValue;
 					}
+
 					break;
-				case 'smtpPort':
+				}
+
+				case 'smtpPort': {
 					if (updatedAccount.smtpConfig) {
-						updatedAccount.smtpConfig.port = parseInt(newValue, 10);
+						updatedAccount.smtpConfig.port = Number.parseInt(newValue, 10);
 					}
+
 					break;
+				}
+
+				default: {
+					break;
+				}
 			}
 
 			await storage.saveAccount(updatedAccount);
 			onComplete();
-		} catch (err) {
-			setError(err instanceof Error ? err.message : 'Failed to save account');
+		} catch (error_: unknown) {
+			setError(
+				error_ instanceof Error ? error_.message : 'Failed to save account',
+			);
 		}
 	};
 
@@ -142,8 +180,8 @@ export const EditAccountView: React.FC<EditAccountViewProps> = ({
 
 	if (!selectedAccount) {
 		const accountItems = accounts.map(account => ({
-			label: `${account.displayName || account.email} (${
-				account.imapConfig?.host || 'No IMAP'
+			label: `${account.displayName ?? account.email} (${
+				account.imapConfig?.host ?? 'No IMAP'
 			})`,
 			value: account.id,
 		}));
@@ -180,7 +218,7 @@ export const EditAccountView: React.FC<EditAccountViewProps> = ({
 		return (
 			<Box flexDirection="column" padding={1}>
 				<Text bold>
-					Editing: {selectedAccount.displayName || selectedAccount.email}
+					Editing: {selectedAccount.displayName ?? selectedAccount.email}
 				</Text>
 				<Text dimColor>Select field to edit:</Text>
 				<Box marginTop={1}>
@@ -217,4 +255,6 @@ export const EditAccountView: React.FC<EditAccountViewProps> = ({
 			</Box>
 		</Box>
 	);
-};
+}
+
+export {EditAccountView};

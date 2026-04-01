@@ -9,3 +9,9 @@ dist
 
 # Env files
 .env
+
+# MCP local config (contains user-specific paths)
+.mcp.json
+
+# Local test scripts
+test-mcp.sh

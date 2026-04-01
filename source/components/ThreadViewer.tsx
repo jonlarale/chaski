@@ -1,13 +1,13 @@
 import React, {useState, useMemo, useEffect} from 'react';
 import {Box, Text, useInput, useStdout} from 'ink';
+import type {EmailService} from '../services/emailService.js';
+import type {EmailAccount, EmailMessage} from '../types/email.js';
+import type {AssistantMessage, AssistantStatus} from '../types/assistant.js';
 import CommandBar from './CommandBar.js';
 import CommandInput from './CommandInput.js';
 import AssistantPanel from './AssistantPanel.js';
-import {EmailService} from '../services/emailService.js';
-import {EmailAccount, EmailMessage} from '../types/email.js';
-import {AssistantMessage, AssistantStatus} from '../types/assistant.js';
 
-interface Message {
+type Message = {
 	id: string;
 	from: string;
 	subject: string;
@@ -19,10 +19,10 @@ interface Message {
 		text?: string;
 		html?: string;
 	};
-	_original?: any; // Original EmailMessage data
-}
+	_original?: EmailMessage;
+};
 
-interface ThreadMessage {
+type ThreadMessage = {
 	id: string;
 	from: string;
 	date: string;
@@ -30,26 +30,28 @@ interface ThreadMessage {
 	content: string;
 	isOriginal: boolean;
 	subject?: string;
-}
+};
 
-interface ThreadViewerProps {
-	originalMessage: Message;
-	onBack: () => void;
-	emailService: EmailService;
-	emailAccounts: EmailAccount[];
-	commandInputActive: boolean;
-	onCommandInputDeactivate: () => void;
-	onCommand: (command: string) => void;
-	assistantMessages: AssistantMessage[];
-	assistantStatus: AssistantStatus;
-	assistantError?: string | null;
-}
+type ThreadViewerProps = {
+	readonly originalMessage: Message;
+	readonly onBack: () => void;
+	readonly emailService: EmailService;
+	readonly emailAccounts: EmailAccount[];
+	readonly isCommandInputActive: boolean;
+	readonly onCommandInputDeactivate: () => void;
+	readonly onCommand: (command: string) => void;
+	readonly assistantMessages: AssistantMessage[];
+	readonly assistantStatus: AssistantStatus;
+	readonly assistantError?: string | undefined;
+};
 
 // Helper to extract email body content
 const extractEmailContent = (body?: {text?: string; html?: string}): string => {
 	if (body?.text) {
 		return body.text;
-	} else if (body?.html) {
+	}
+
+	if (body?.html) {
 		// Simple HTML stripping
 		return body.html
 			.replace(/<[^>]*>/g, '')
@@ -62,6 +64,7 @@ const extractEmailContent = (body?: {text?: string; html?: string}): string => {
 			.replace(/\s+/g, ' ')
 			.trim();
 	}
+
 	return 'No content available';
 };
 
@@ -218,31 +221,31 @@ Thank you for banking with us!`,
 	],
 };
 
-const ThreadViewer: React.FC<ThreadViewerProps> = ({
+function ThreadViewer({
 	originalMessage,
 	onBack,
 	emailService,
 	emailAccounts,
-	commandInputActive,
+	isCommandInputActive,
 	onCommandInputDeactivate,
 	onCommand,
 	assistantMessages,
 	assistantStatus,
 	assistantError,
-}) => {
+}: ThreadViewerProps) {
 	const [currentPage, setCurrentPage] = useState(0);
 	const [loading, setLoading] = useState(true);
 	const [threadEmails, setThreadEmails] = useState<EmailMessage[]>([]);
 	const {write} = useStdout();
 
-	// Limpiar pantalla cuando el componente se monta y desmonta
+	// Clear screen when component mounts and unmounts
 	useEffect(() => {
-		// Limpiar pantalla al montar
-		write('\x1b[2J\x1b[H');
+		// Clear screen on mount
+		write('\u001B[2J\u001B[H');
 
 		return () => {
-			// Limpiar pantalla al desmontar
-			write('\x1b[2J\x1b[H');
+			// Clear screen on unmount
+			write('\u001B[2J\u001B[H');
 		};
 	}, [write]);
 
@@ -251,6 +254,7 @@ const ThreadViewer: React.FC<ThreadViewerProps> = ({
 		const fetchThreadMessages = async () => {
 			if (!originalMessage._original) {
 				setLoading(false);
+
 				return;
 			}
 
@@ -264,6 +268,7 @@ const ThreadViewer: React.FC<ThreadViewerProps> = ({
 				if (!account) {
 					console.error('Account not found for message');
 					setLoading(false);
+
 					return;
 				}
 
@@ -272,18 +277,18 @@ const ThreadViewer: React.FC<ThreadViewerProps> = ({
 					account.id,
 					original.folder,
 					original.messageId,
-					original.references || [],
+					original.references ?? [],
 				);
 
 				setThreadEmails(messages);
-			} catch (error) {
-				console.error('Error fetching thread messages:', error);
+			} catch (error_: unknown) {
+				console.error('Error fetching thread messages:', error_);
 			} finally {
 				setLoading(false);
 			}
 		};
 
-		fetchThreadMessages();
+		void fetchThreadMessages();
 	}, [originalMessage, emailService, emailAccounts]);
 
 	const threadMessages = useMemo(() => {
@@ -293,7 +298,7 @@ const ThreadViewer: React.FC<ThreadViewerProps> = ({
 				const from = email.from[0];
 				const fromString = from?.name
 					? `${from.name} <${from.address}>`
-					: from?.address || 'Unknown';
+					: from?.address ?? 'Unknown';
 				const messageDate = new Date(email.date);
 
 				return {
@@ -357,7 +362,7 @@ const ThreadViewer: React.FC<ThreadViewerProps> = ({
 			time?: string;
 		}> = [];
 
-		threadMessages.forEach((message, index) => {
+		for (const [index, message] of threadMessages.entries()) {
 			// Add spacing before non-first messages
 			if (index > 0) {
 				lines.push({
@@ -367,7 +372,7 @@ const ThreadViewer: React.FC<ThreadViewerProps> = ({
 				});
 			}
 
-			// Header del mensaje
+			// Message header
 			lines.push({
 				type: 'header',
 				messageIndex: index,
@@ -380,35 +385,34 @@ const ThreadViewer: React.FC<ThreadViewerProps> = ({
 
 			// Message content (split into lines)
 			const contentLines = message.content.split('\n');
-			contentLines.forEach(line => {
+
+			for (const line of contentLines) {
 				lines.push({
 					type: 'content',
 					messageIndex: index,
 					content: line,
 				});
-			});
-		});
+			}
+		}
 
 		return lines;
 	}, [threadMessages]);
 
 	// Pagination configuration
-	// const HEADER_LINES = 4; // Header + scroll info
-	// const FOOTER_LINES = 3; // Footer + espacio
-	const CONTENT_HEIGHT = 15; // Available height for content
-	const LINES_PER_PAGE = CONTENT_HEIGHT;
+	const contentHeight = 15; // Available height for content
+	const linesPerPage = contentHeight;
 
 	const totalPages = Math.max(
 		1,
-		Math.ceil(expandedContent.length / LINES_PER_PAGE),
+		Math.ceil(expandedContent.length / linesPerPage),
 	);
-	const startLine = currentPage * LINES_PER_PAGE;
-	const endLine = Math.min(startLine + LINES_PER_PAGE, expandedContent.length);
+	const startLine = currentPage * linesPerPage;
+	const endLine = Math.min(startLine + linesPerPage, expandedContent.length);
 	const visibleLines = expandedContent.slice(startLine, endLine);
 
 	useInput((_input, key) => {
 		// If command input is active, don't handle navigation keys
-		if (commandInputActive) return;
+		if (isCommandInputActive) return;
 
 		if (key.downArrow && !key.shift) {
 			// Down arrow: advance page
@@ -422,7 +426,7 @@ const ThreadViewer: React.FC<ThreadViewerProps> = ({
 		} else if (key.downArrow && key.shift) {
 			// Shift + Down arrow: go to end
 			setCurrentPage(totalPages - 1);
-		} else if (key.escape || key.leftArrow) {
+		} else if (key.escape ?? key.leftArrow) {
 			// ESC or ← to go back
 			onBack();
 		}
@@ -430,7 +434,7 @@ const ThreadViewer: React.FC<ThreadViewerProps> = ({
 
 	const renderLine = (line: (typeof expandedContent)[0], index: number) => {
 		switch (line.type) {
-			case 'header':
+			case 'header': {
 				return (
 					<Box
 						key={`${line.messageIndex}-header-${index}`}
@@ -448,22 +452,29 @@ const ThreadViewer: React.FC<ThreadViewerProps> = ({
 						</Box>
 					</Box>
 				);
-			case 'content':
+			}
+
+			case 'content': {
 				return (
 					<Box key={`${line.messageIndex}-content-${index}`} paddingLeft={2}>
 						<Text>{line.content || ' '}</Text>
 					</Box>
 				);
-			case 'separator':
+			}
+
+			case 'separator': {
 				return (
 					<Box key={`${line.messageIndex}-separator-${index}`} marginY={1}>
-						<Text color="gray" dimColor>
+						<Text dimColor color="gray">
 							{'─'.repeat(60)}
 						</Text>
 					</Box>
 				);
-			default:
+			}
+
+			default: {
 				return null;
+			}
 		}
 	};
 
@@ -472,11 +483,11 @@ const ThreadViewer: React.FC<ThreadViewerProps> = ({
 		return (
 			<Box flexDirection="column" height="100%">
 				<Box
-					borderStyle="single"
-					borderBottom={true}
-					borderTop={false}
+					borderBottom
 					borderLeft={false}
 					borderRight={false}
+					borderStyle="single"
+					borderTop={false}
 					padding={1}
 				>
 					<Box justifyContent="space-between">
@@ -497,11 +508,11 @@ const ThreadViewer: React.FC<ThreadViewerProps> = ({
 		<Box flexDirection="column" height="100%">
 			{/* Header */}
 			<Box
-				borderStyle="single"
-				borderBottom={true}
-				borderTop={false}
+				borderBottom
 				borderLeft={false}
 				borderRight={false}
+				borderStyle="single"
+				borderTop={false}
 				padding={1}
 			>
 				<Box flexDirection="column" width="100%">
@@ -530,14 +541,14 @@ const ThreadViewer: React.FC<ThreadViewerProps> = ({
 			{/* Content Area */}
 			<Box
 				flexDirection="column"
-				padding={1}
 				flexGrow={1}
-				height={CONTENT_HEIGHT}
+				height={contentHeight}
+				padding={1}
 			>
 				{visibleLines.map((line, index) => renderLine(line, index))}
 
 				{/* Fill remaining space if needed */}
-				{visibleLines.length < LINES_PER_PAGE && <Box flexGrow={1} />}
+				{visibleLines.length < linesPerPage && <Box flexGrow={1} />}
 			</Box>
 
 			{/* Navigation indicators */}
@@ -553,33 +564,31 @@ const ThreadViewer: React.FC<ThreadViewerProps> = ({
 				</Box>
 			)}
 
-			{/* Footer */}
 			{/* Command Input */}
 			<AssistantPanel
+				error={assistantError}
 				messages={assistantMessages}
 				status={assistantStatus}
-				error={assistantError}
 			/>
 			<CommandInput
-				isActive={commandInputActive}
-				onDeactivate={onCommandInputDeactivate}
+				isActive={isCommandInputActive}
 				onCommand={onCommand}
+				onDeactivate={onCommandInputDeactivate}
 			/>
 
 			{/* Footer */}
 			<CommandBar
-				onQuit={onBack}
-				view="thread"
-				commandInputActive={commandInputActive}
 				commands={[
 					{key: '↑↓', label: 'Navigate', action: 'navigate'},
 					{key: 'Shift+↑', label: 'Top', action: 'select'},
 					{key: 'Shift+↓', label: 'End', action: 'select'},
 					{key: 'ESC', label: 'Back', action: 'back'},
 				]}
+				isCommandInputActive={isCommandInputActive}
+				view="thread"
 			/>
 		</Box>
 	);
-};
+}
 
 export default ThreadViewer;

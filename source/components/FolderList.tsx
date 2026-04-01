@@ -1,7 +1,7 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput} from 'ink';
-import {EmailService} from '../services/emailService.js';
-import {EmailAccount, EmailFolder} from '../types/email.js';
+import type {EmailService} from '../services/emailService.js';
+import type {EmailAccount, EmailFolder} from '../types/email.js';
 import {useDebug} from '../utils/debug.js';
 import {colors, semanticColors, spacing} from '../constants/index.js';
 
@@ -11,49 +11,83 @@ const formatCount = (count: number): string => {
 	return count.toString();
 };
 
-interface FolderListProps {
-	onSelect: (folder: string, account?: string) => void;
-	onExpand: (expanded: boolean) => void; // To notify when a folder expands/collapses
-	hasFocus: boolean;
-	selectedFolder: string;
-	selectedAccount?: string;
-	width?: number;
-	emailService: EmailService;
-	emailAccounts: EmailAccount[];
-}
+type FolderListProps = {
+	readonly onSelect: (folder: string, account?: string) => void;
+	readonly onExpand: (expanded: boolean) => void; // To notify when a folder expands/collapses
+	readonly hasFocus: boolean;
+	readonly selectedFolder: string;
+	readonly selectedAccount?: string;
+	readonly width?: number;
+	readonly emailService: EmailService;
+	readonly emailAccounts: EmailAccount[];
+};
 
-interface AccountWithCount {
+type AccountWithCount = {
 	account: EmailAccount;
 	count: number;
 	originalFolderName: string;
-}
+};
 
-interface FolderData {
+type FolderData = {
 	name: string;
 	label: string;
 	accounts: AccountWithCount[];
 	expanded: boolean;
-}
+};
 
 // Map standard folder names to labels with icons
 const folderLabels: Record<string, string> = {
+	// eslint-disable-next-line @typescript-eslint/naming-convention
 	INBOX: '📥 All Inboxes',
+	// eslint-disable-next-line @typescript-eslint/naming-convention
 	SENT: '📤 All Sent',
+	// eslint-disable-next-line @typescript-eslint/naming-convention
 	DRAFTS: '📝 All Drafts',
+	// eslint-disable-next-line @typescript-eslint/naming-convention
 	SPAM: '🚫 All Spam',
+	// eslint-disable-next-line @typescript-eslint/naming-convention
 	JUNK: '🚫 All Spam',
+	// eslint-disable-next-line @typescript-eslint/naming-convention
 	TRASH: '🗑️ All Trash',
+	// eslint-disable-next-line @typescript-eslint/naming-convention
 	DELETED: '🗑️ All Trash',
+	// eslint-disable-next-line @typescript-eslint/naming-convention
 	ARCHIVE: '📦 All Archive',
 };
 
 // Get a display label for a folder
 const getFolderLabel = (folderName: string): string => {
 	const upperName = folderName.toUpperCase();
-	return folderLabels[upperName] || `📁 ${folderName}`;
+	return folderLabels[upperName] ?? `📁 ${folderName}`;
 };
 
-const FolderList: React.FC<FolderListProps> = ({
+// Normalize folder names to handle different provider conventions
+const normalizeFolderName = (folderName: string): string => {
+	const upper = folderName.toUpperCase();
+	switch (upper) {
+		case 'SENT MAIL':
+		case 'SENT MESSAGES':
+		case 'SENT ITEMS': {
+			return 'SENT';
+		}
+
+		case 'DELETED MESSAGES':
+		case 'DELETED ITEMS': {
+			return 'DELETED';
+		}
+
+		case 'JUNK E-MAIL':
+		case 'JUNK MAIL': {
+			return 'JUNK';
+		}
+
+		default: {
+			return upper;
+		}
+	}
+};
+
+function FolderList({
 	onSelect,
 	onExpand,
 	hasFocus,
@@ -62,11 +96,11 @@ const FolderList: React.FC<FolderListProps> = ({
 	width = 20,
 	emailService,
 	emailAccounts,
-}) => {
+}: FolderListProps) {
 	const debug = useDebug('FolderList');
 	const [foldersState, setFoldersState] = useState<FolderData[]>([]);
 	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
+	const [error, setError] = useState<string | undefined>(undefined);
 	const [rootHoveredIndex, setRootHoveredIndex] = useState(0); // Index for root folders
 	const [accountHoveredIndex, setAccountHoveredIndex] = useState(0); // Index for sub-accounts
 	const [navigationMode, setNavigationMode] = useState<'root' | 'accounts'>(
@@ -83,60 +117,46 @@ const FolderList: React.FC<FolderListProps> = ({
 
 			try {
 				setLoading(true);
-				setError(null);
+				setError(undefined);
 
 				// Load folders for each account
 				const folderPromises = emailAccounts.map(async account => {
 					try {
 						const folders = await emailService.getFolders(account.id);
 						return {accountId: account.id, folders};
-					} catch (err) {
-						console.error(`Failed to load folders for ${account.email}:`, err);
-						return {accountId: account.id, folders: []};
+					} catch (error_: unknown) {
+						console.error(
+							`Failed to load folders for ${account.email}:`,
+							error_,
+						);
+						return {accountId: account.id, folders: [] as EmailFolder[]};
 					}
 				});
 
 				const results = await Promise.all(folderPromises);
 				const folderMap: Record<string, EmailFolder[]> = {};
-				results.forEach(({accountId, folders}) => {
+				for (const {accountId, folders} of results) {
 					folderMap[accountId] = folders;
-				});
+				}
 
 				// Group folders by name across accounts
 				const folderGroups = new Map<string, AccountWithCount[]>();
 
 				// Collect all INBOX status requests to run in parallel
-				const inboxStatusPromises: Promise<{
-					accountId: string;
-					folderName: string;
-					unseen: number;
-				}>[] = [];
+				const inboxStatusPromises: Array<
+					Promise<{
+						accountId: string;
+						folderName: string;
+						unseen: number;
+					}>
+				> = [];
 
 				for (const account of emailAccounts) {
-					const accountFolders = folderMap[account.id] || [];
+					const accountFolders = folderMap[account.id] ?? [];
 
 					for (const folder of accountFolders) {
 						// Normalize folder names to handle different conventions
-						let normalizedName = folder.name.toUpperCase();
-
-						// Handle common variations
-						if (
-							normalizedName === 'SENT MAIL' ||
-							normalizedName === 'SENT MESSAGES' ||
-							normalizedName === 'SENT ITEMS'
-						) {
-							normalizedName = 'SENT';
-						} else if (
-							normalizedName === 'DELETED MESSAGES' ||
-							normalizedName === 'DELETED ITEMS'
-						) {
-							normalizedName = 'DELETED';
-						} else if (
-							normalizedName === 'JUNK E-MAIL' ||
-							normalizedName === 'JUNK MAIL'
-						) {
-							normalizedName = 'JUNK';
-						}
+						const normalizedName = normalizeFolderName(folder.name);
 
 						if (!folderGroups.has(normalizedName)) {
 							folderGroups.set(normalizedName, []);
@@ -152,10 +172,10 @@ const FolderList: React.FC<FolderListProps> = ({
 										folderName: folder.name,
 										unseen: status.unseen,
 									}))
-									.catch(err => {
+									.catch((error_: unknown) => {
 										console.error(
 											`Failed to get folder status for ${account.email}/${folder.name}:`,
-											err,
+											error_,
 										);
 										return {
 											accountId: account.id,
@@ -176,35 +196,16 @@ const FolderList: React.FC<FolderListProps> = ({
 
 				// Now build the folder groups with the status data
 				for (const account of emailAccounts) {
-					const accountFolders = folderMap[account.id] || [];
+					const accountFolders = folderMap[account.id] ?? [];
 
 					for (const folder of accountFolders) {
 						// Normalize folder names to handle different conventions
-						let normalizedName = folder.name.toUpperCase();
-
-						// Handle common variations
-						if (
-							normalizedName === 'SENT MAIL' ||
-							normalizedName === 'SENT MESSAGES' ||
-							normalizedName === 'SENT ITEMS'
-						) {
-							normalizedName = 'SENT';
-						} else if (
-							normalizedName === 'DELETED MESSAGES' ||
-							normalizedName === 'DELETED ITEMS'
-						) {
-							normalizedName = 'DELETED';
-						} else if (
-							normalizedName === 'JUNK E-MAIL' ||
-							normalizedName === 'JUNK MAIL'
-						) {
-							normalizedName = 'JUNK';
-						}
+						const normalizedName = normalizeFolderName(folder.name);
 
 						// Get unread count from our parallel fetch results
 						const unreadCount =
 							normalizedName === 'INBOX'
-								? statusMap.get(`${account.id}:${folder.name}`) || 0
+								? statusMap.get(`${account.id}:${folder.name}`) ?? 0
 								: 0;
 
 						folderGroups.get(normalizedName)!.push({
@@ -253,20 +254,22 @@ const FolderList: React.FC<FolderListProps> = ({
 				}
 
 				setFoldersState(folderData);
-			} catch (err) {
-				setError(err instanceof Error ? err.message : 'Failed to load folders');
+			} catch (error_: unknown) {
+				setError(
+					error_ instanceof Error ? error_.message : 'Failed to load folders',
+				);
 			} finally {
 				setLoading(false);
 			}
 		};
 
-		loadFolders();
+		void loadFolders();
 	}, [emailService, emailAccounts]);
 
 	// Helper function to truncate text
 	const truncateText = (text: string, maxLength: number) => {
 		if (text.length <= maxLength) return text;
-		return text.substring(0, maxLength - 3) + '...';
+		return text.slice(0, maxLength - 3) + '...';
 	};
 
 	// Calculate available width for account text
@@ -299,8 +302,8 @@ const FolderList: React.FC<FolderListProps> = ({
 						wasExpanded,
 					});
 
-					setFoldersState(prev =>
-						prev.map(folder => ({
+					setFoldersState(previous =>
+						previous.map(folder => ({
 							...folder,
 							// Only keep selected folder expanded
 							expanded:
@@ -351,8 +354,8 @@ const FolderList: React.FC<FolderListProps> = ({
 				if (key.leftArrow) {
 					// ← to go back to root mode and collapse folders
 					setNavigationMode('root');
-					setFoldersState(prev =>
-						prev.map(folder => ({
+					setFoldersState(previous =>
+						previous.map(folder => ({
 							...folder,
 							expanded: false,
 						})),
@@ -404,19 +407,12 @@ const FolderList: React.FC<FolderListProps> = ({
 			<Text bold color={hasFocus ? semanticColors.folder.header : colors.gray}>
 				📁 Folders
 			</Text>
-			<Box marginTop={spacing.marginSM} flexDirection="column">
+			<Box flexDirection="column" marginTop={spacing.marginSm}>
 				{foldersState.map((folder, folderIndex) => (
 					<React.Fragment key={folder.name}>
 						{/* Root folder */}
 						<Box marginBottom={0}>
 							<Text
-								color={
-									navigationMode === 'root' &&
-									folderIndex === rootHoveredIndex &&
-									hasFocus
-										? colors.white
-										: semanticColors.folder.text
-								}
 								backgroundColor={
 									navigationMode === 'root' &&
 									folderIndex === rootHoveredIndex &&
@@ -428,6 +424,13 @@ const FolderList: React.FC<FolderListProps> = ({
 									navigationMode === 'root' &&
 									folderIndex === rootHoveredIndex &&
 									hasFocus
+								}
+								color={
+									navigationMode === 'root' &&
+									folderIndex === rootHoveredIndex &&
+									hasFocus
+										? colors.white
+										: semanticColors.folder.text
 								}
 							>
 								{folder.expanded ? '▼ ' : '▶ '}
@@ -454,6 +457,10 @@ const FolderList: React.FC<FolderListProps> = ({
 									return (
 										<Box key={accountData.account.email} marginBottom={0}>
 											<Text
+												backgroundColor={
+													isHovered ? semanticColors.folder.selected : undefined
+												}
+												bold={isSelected || isHovered}
 												color={
 													isSelected
 														? colors.green
@@ -461,21 +468,17 @@ const FolderList: React.FC<FolderListProps> = ({
 														? colors.white
 														: colors.gray
 												}
-												backgroundColor={
-													isHovered ? semanticColors.folder.selected : undefined
-												}
-												bold={isSelected || isHovered}
 											>
 												{isSelected ? '→ ' : '  '}
 												{(() => {
-													const email = accountData.account.email;
-													const countStr = accountData.count > 0 ? ` ` : '';
-													const fullText = `${email}${countStr}`;
+													const {email} = accountData.account;
+													const countString = accountData.count > 0 ? ` ` : '';
+													const fullText = `${email}${countString}`;
 
 													// If text needs truncation, truncate email but keep count
 													if (fullText.length > accountTextWidth) {
 														const availableWidth =
-															accountTextWidth - countStr.length - 5; // Extra space for count
+															accountTextWidth - countString.length - 5; // Extra space for count
 														const truncatedEmail = truncateText(
 															email,
 															availableWidth,
@@ -486,7 +489,7 @@ const FolderList: React.FC<FolderListProps> = ({
 													return email;
 												})()}
 												{accountData.count > 0 && (
-													<Text color={colors.white} bold>
+													<Text bold color={colors.white}>
 														{' '}
 														({formatCount(accountData.count)})
 													</Text>
@@ -502,6 +505,6 @@ const FolderList: React.FC<FolderListProps> = ({
 			</Box>
 		</Box>
 	);
-};
+}
 
 export default FolderList;

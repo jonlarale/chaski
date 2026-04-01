@@ -1,27 +1,27 @@
 import React, {useState, useEffect, useMemo} from 'react';
 import {Box, Text, useInput} from 'ink';
 
-interface TextAreaProps {
-	value: string;
-	onChange: (value: string) => void;
-	placeholder?: string;
-	focus?: boolean;
-	height?: number;
-	width?: number;
-	onUpArrowAtTop?: () => void;
-	onDownArrowAtBottom?: () => void;
-}
+type TextAreaProps = {
+	readonly value: string;
+	readonly onChange: (value: string) => void;
+	readonly placeholder?: string;
+	readonly isFocus?: boolean;
+	readonly height?: number;
+	readonly width?: number;
+	readonly onUpArrowAtTop?: () => void;
+	readonly onDownArrowAtBottom?: () => void;
+};
 
-const TextArea: React.FC<TextAreaProps> = ({
+function TextArea({
 	value,
 	onChange,
 	placeholder = '',
-	focus = false,
+	isFocus = false,
 	height = 10,
 	width = 50,
 	onUpArrowAtTop,
 	onDownArrowAtBottom,
-}) => {
+}: TextAreaProps) {
 	const [cursorPosition, setCursorPosition] = useState(value.length);
 	const [scrollOffset, setScrollOffset] = useState(0);
 
@@ -43,11 +43,14 @@ const TextArea: React.FC<TextAreaProps> = ({
 		for (const word of words) {
 			// Handle newlines within words
 			const wordParts = word.split('\n');
-			for (let i = 0; i < wordParts.length; i++) {
-				const part = wordParts[i];
-				if (!part) continue;
+			let firstPart = true;
+			for (const part of wordParts) {
+				if (!part) {
+					firstPart = false;
+					continue;
+				}
 
-				if (i > 0) {
+				if (!firstPart) {
 					// New line
 					wrappedLines.push(currentLine);
 					currentLine = '';
@@ -59,6 +62,8 @@ const TextArea: React.FC<TextAreaProps> = ({
 					if (currentLine) wrappedLines.push(currentLine);
 					currentLine = part;
 				}
+
+				firstPart = false;
 			}
 		}
 
@@ -71,15 +76,22 @@ const TextArea: React.FC<TextAreaProps> = ({
 	// Calculate cursor line and column
 	const {cursorLine, cursorCol} = useMemo(() => {
 		let pos = 0;
-		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i];
-			if (!line) continue;
+		let lineIndex = 0;
+		for (const line of lines) {
+			if (!line) {
+				lineIndex++;
+				continue;
+			}
+
 			const lineLength = line.length;
 			if (pos + lineLength >= cursorPosition) {
-				return {cursorLine: i, cursorCol: cursorPosition - pos};
+				return {cursorLine: lineIndex, cursorCol: cursorPosition - pos};
 			}
+
 			pos += lineLength + 1; // +1 for newline/space
+			lineIndex++;
 		}
+
 		const lastLine = lines[lines.length - 1];
 		return {
 			cursorLine: lines.length - 1,
@@ -98,7 +110,7 @@ const TextArea: React.FC<TextAreaProps> = ({
 
 	useInput(
 		(input, key) => {
-			if (!focus) return;
+			if (!isFocus) return;
 
 			// Handle backspace - always delete character before cursor
 			if (key.backspace) {
@@ -108,6 +120,7 @@ const TextArea: React.FC<TextAreaProps> = ({
 					onChange(newValue);
 					setCursorPosition(cursorPosition - 1);
 				}
+
 				return;
 			}
 
@@ -119,12 +132,13 @@ const TextArea: React.FC<TextAreaProps> = ({
 						value.slice(0, cursorPosition) + value.slice(cursorPosition + 1);
 					onChange(newValue);
 				} else if (cursorPosition > 0) {
-					// Backspace behavior when cursor is at end (for terminals that send delete for backspace)
+					// Backspace behavior when cursor is at end (for terminals that don't set key flags)
 					const newValue =
 						value.slice(0, cursorPosition - 1) + value.slice(cursorPosition);
 					onChange(newValue);
 					setCursorPosition(cursorPosition - 1);
 				}
+
 				return;
 			}
 
@@ -135,15 +149,16 @@ const TextArea: React.FC<TextAreaProps> = ({
 			} else if (key.upArrow) {
 				// Move cursor up
 				if (cursorLine > 0) {
-					const prevLine = lines[cursorLine - 1];
-					if (prevLine) {
-						const prevLineLength = prevLine.length;
-						const newCol = Math.min(cursorCol, prevLineLength);
+					const previousLine = lines[cursorLine - 1];
+					if (previousLine) {
+						const previousLineLength = previousLine.length;
+						const newCol = Math.min(cursorCol, previousLineLength);
 						let newPos = 0;
 						for (let i = 0; i < cursorLine - 1; i++) {
 							const line = lines[i];
 							if (line) newPos += line.length + 1;
 						}
+
 						newPos += newCol;
 						setCursorPosition(newPos);
 					}
@@ -163,6 +178,7 @@ const TextArea: React.FC<TextAreaProps> = ({
 							const line = lines[i];
 							if (line) newPos += line.length + 1;
 						}
+
 						newPos += newCol;
 						setCursorPosition(Math.min(newPos, value.length));
 					}
@@ -181,7 +197,7 @@ const TextArea: React.FC<TextAreaProps> = ({
 
 			// Handle character input
 			if (input && !key.ctrl && !key.meta && input.length === 1) {
-				const charCode = input.charCodeAt(0);
+				const charCode = input.codePointAt(0) ?? 0;
 
 				// Check for backspace character codes (fallback for terminals that don't set key flags)
 				if (charCode === 127 || charCode === 8) {
@@ -191,6 +207,7 @@ const TextArea: React.FC<TextAreaProps> = ({
 						onChange(newValue);
 						setCursorPosition(cursorPosition - 1);
 					}
+
 					return;
 				}
 
@@ -205,7 +222,7 @@ const TextArea: React.FC<TextAreaProps> = ({
 				}
 			}
 		},
-		{isActive: focus},
+		{isActive: isFocus},
 	);
 
 	// Get visible lines
@@ -221,9 +238,10 @@ const TextArea: React.FC<TextAreaProps> = ({
 			const textColor = value ? 'white' : 'gray';
 
 			return (
+				// eslint-disable-next-line react/no-array-index-key
 				<Box key={index}>
 					<Text color={textColor}>{beforeCursor}</Text>
-					{focus && (
+					{isFocus && (
 						<Text backgroundColor="blue" color="blue">
 							│
 						</Text>
@@ -231,13 +249,14 @@ const TextArea: React.FC<TextAreaProps> = ({
 					<Text color={textColor}>{afterCursor || ' '}</Text>
 				</Box>
 			);
-		} else {
-			return (
-				<Text key={index} color={value ? 'white' : 'gray'}>
-					{line || ' '}
-				</Text>
-			);
 		}
+
+		return (
+			// eslint-disable-next-line react/no-array-index-key
+			<Text key={index} color={value ? 'white' : 'gray'}>
+				{line || ' '}
+			</Text>
+		);
 	});
 
 	// Scroll indicators
@@ -247,28 +266,28 @@ const TextArea: React.FC<TextAreaProps> = ({
 	return (
 		<Box flexDirection="column" width={width}>
 			{canScrollUp && (
-				<Text color="blue" dimColor>
+				<Text dimColor color="blue">
 					▲ More above ▲
 				</Text>
 			)}
 			<Box
-				flexDirection="column"
+				borderColor={isFocus ? 'blue' : 'gray'}
 				borderStyle="round"
-				borderColor={focus ? 'blue' : 'gray'}
-				padding={1}
+				flexDirection="column"
 				height={height + 2}
+				padding={1}
 			>
 				{renderedLines}
 				{/* Fill remaining space */}
 				{renderedLines.length < height && <Box flexGrow={1} />}
 			</Box>
 			{canScrollDown && (
-				<Text color="blue" dimColor>
+				<Text dimColor color="blue">
 					▼ More below ▼
 				</Text>
 			)}
 		</Box>
 	);
-};
+}
 
 export default TextArea;

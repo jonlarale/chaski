@@ -1,11 +1,11 @@
-import Database from 'better-sqlite3';
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import * as os from 'node:os';
-import {EmailMessage} from '../types/email.js';
-import {debugLog, LogLevel} from '../utils/debug.js';
+import * as path from 'node:path';
+import Database from 'better-sqlite3';
+import type {EmailMessage} from '../types/email.js';
+import {debugLog, LogLevel} from '../utils/debug-core.js';
 
-interface CachedMessage {
+type CachedMessage = {
 	id: number;
 	uid: number;
 	folder_id: string;
@@ -19,26 +19,26 @@ interface CachedMessage {
 	has_attachments: boolean;
 	thread_count: number;
 	last_fetched: number;
-}
+};
 
-interface CachedAttachment {
+type CachedAttachment = {
 	filename: string;
 	content_type: string;
 	size: number;
-	content_id: string | null;
-}
+	content_id: string | undefined;
+};
 
-// interface CachedFolder {
+// Type CachedFolder = {
 // 	id: string;
 // 	account_id: string;
 // 	name: string;
 // 	last_sync: number;
 // 	total_count: number;
 // 	unread_count: number;
-// }
+// };
 
 export class CacheService {
-	private db: Database.Database | null = null;
+	private db: Database.Database | undefined = undefined;
 	private readonly cacheDir: string;
 	private readonly dbPath: string;
 
@@ -47,6 +47,365 @@ export class CacheService {
 		this.cacheDir = path.join(os.homedir(), '.chaski', 'cache');
 		this.dbPath = path.join(this.cacheDir, 'messages.db');
 		this.initializeDatabase();
+	}
+
+	// Get cached messages for a folder
+	async getCachedMessages(
+		folderId: string,
+		accountId: string,
+		limit = 50,
+		offset = 0,
+	): Promise<EmailMessage[]> {
+		if (!this.db) return [];
+
+		try {
+			const stmt = this.db.prepare(`
+				SELECT * FROM messages
+				WHERE folder_id = ? AND account_id = ?
+				ORDER BY date DESC
+				LIMIT ? OFFSET ?
+			`);
+
+			const rows = stmt.all(
+				folderId,
+				accountId,
+				limit,
+				offset,
+			) as CachedMessage[];
+
+			// Get attachments for each message
+			const attachmentStmt = this.db.prepare(`
+				SELECT filename, content_type, size, content_id
+				FROM attachments
+				WHERE message_uid = ? AND folder_id = ? AND account_id = ?
+			`);
+
+			return rows.map(row => {
+				const attachments = attachmentStmt.all(
+					row.uid,
+					folderId,
+					accountId,
+				) as CachedAttachment[];
+
+				return this.cachedMessageToEmailMessage(row, attachments);
+			});
+		} catch (error: unknown) {
+			debugLog(
+				LogLevel.ERROR,
+				'CacheService',
+				'Failed to get cached messages:',
+				error,
+			);
+			return [];
+		}
+	}
+
+	// Update messages in cache
+	async updateMessages(
+		messages: EmailMessage[],
+		folderId: string,
+		accountId: string,
+	): Promise<void> {
+		if (!this.db) return;
+
+		const insertStmt = this.db.prepare(`
+			INSERT OR REPLACE INTO messages (
+				uid, folder_id, account_id, subject, from_name, from_address,
+				date, flags, preview, has_attachments, thread_count, last_fetched
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`);
+
+		// Prepare statement for inserting attachments
+		const insertAttachmentStmt = this.db.prepare(`
+			INSERT OR REPLACE INTO attachments (
+				message_uid, folder_id, account_id, filename, content_type, size, content_id
+			) VALUES (?, ?, ?, ?, ?, ?, ?)
+		`);
+
+		// Delete existing attachments for these messages before inserting new ones
+		const deleteAttachmentsStmt = this.db.prepare(`
+			DELETE FROM attachments WHERE message_uid = ? AND folder_id = ? AND account_id = ?
+		`);
+
+		const transaction = this.db.transaction((msgs: EmailMessage[]) => {
+			const now = Date.now();
+			for (const message of msgs) {
+				const fromEmail = message.from[0];
+				const preview = message.body.text
+					? message.body.text.slice(0, 200).replace(/\n/g, ' ').trim()
+					: '';
+
+				insertStmt.run(
+					message.uid,
+					folderId,
+					accountId,
+					message.subject ?? '(No subject)',
+					fromEmail?.name ?? '',
+					fromEmail?.address ?? '',
+					new Date(message.date).getTime(),
+					message.flags.join(','),
+					preview,
+					message.attachments && message.attachments.length > 0 ? 1 : 0,
+					message.references ? message.references.length : 0,
+					now,
+				);
+
+				// First, delete existing attachments for this message
+				deleteAttachmentsStmt.run(message.uid, folderId, accountId);
+
+				// Then insert new attachments if any
+				if (message.attachments && message.attachments.length > 0) {
+					for (const attachment of message.attachments) {
+						insertAttachmentStmt.run(
+							message.uid,
+							folderId,
+							accountId,
+							attachment.filename ?? 'unnamed',
+							attachment.contentType ?? 'application/octet-stream',
+							attachment.size ?? 0,
+							attachment.contentId,
+						);
+					}
+				}
+			}
+		});
+
+		try {
+			transaction(messages);
+			debugLog(
+				LogLevel.INFO,
+				'CacheService',
+				`Updated ${messages.length} messages in cache`,
+			);
+		} catch (error: unknown) {
+			debugLog(
+				LogLevel.ERROR,
+				'CacheService',
+				'Failed to update messages:',
+				error,
+			);
+		}
+	}
+
+	// Get last sync time for a folder
+	async getLastSyncTime(
+		folderId: string,
+		accountId: string,
+	): Promise<Date | undefined> {
+		if (!this.db) return undefined;
+
+		try {
+			const stmt = this.db.prepare(`
+				SELECT MAX(last_fetched) as last_sync FROM messages
+				WHERE folder_id = ? AND account_id = ?
+			`);
+
+			const result = stmt.get(folderId, accountId) as {
+				last_sync: number | undefined;
+			};
+			return result.last_sync ? new Date(result.last_sync) : undefined;
+		} catch (error: unknown) {
+			debugLog(
+				LogLevel.ERROR,
+				'CacheService',
+				'Failed to get last sync time:',
+				error,
+			);
+			return undefined;
+		}
+	}
+
+	// Update folder metadata
+	async updateFolderMetadata(
+		folderId: string,
+		accountId: string,
+		totalCount: number,
+		unreadCount: number,
+	): Promise<void> {
+		if (!this.db) return;
+
+		try {
+			const stmt = this.db.prepare(`
+				INSERT OR REPLACE INTO folders (id, account_id, name, last_sync, total_count, unread_count)
+				VALUES (?, ?, ?, ?, ?, ?)
+			`);
+
+			stmt.run(
+				`${accountId}:${folderId}`,
+				accountId,
+				folderId,
+				Date.now(),
+				totalCount,
+				unreadCount,
+			);
+		} catch (error: unknown) {
+			debugLog(
+				LogLevel.ERROR,
+				'CacheService',
+				'Failed to update folder metadata:',
+				error,
+			);
+		}
+	}
+
+	// Clear cache for a specific folder
+	async clearFolder(folderId: string, accountId: string): Promise<void> {
+		if (!this.db) return;
+
+		try {
+			const stmt = this.db.prepare(`
+				DELETE FROM messages WHERE folder_id = ? AND account_id = ?
+			`);
+			stmt.run(folderId, accountId);
+			debugLog(
+				LogLevel.INFO,
+				'CacheService',
+				`Cleared cache for folder ${folderId}`,
+			);
+		} catch (error: unknown) {
+			debugLog(
+				LogLevel.ERROR,
+				'CacheService',
+				'Failed to clear folder cache:',
+				error,
+			);
+		}
+	}
+
+	// Clear all cache
+	async clearAllCache(): Promise<void> {
+		if (!this.db) return;
+
+		try {
+			this.db.exec('DELETE FROM messages');
+			this.db.exec('DELETE FROM folders');
+			this.db.exec('DELETE FROM message_bodies');
+			debugLog(LogLevel.INFO, 'CacheService', 'Cleared all cache');
+		} catch (error: unknown) {
+			debugLog(
+				LogLevel.ERROR,
+				'CacheService',
+				'Failed to clear all cache:',
+				error,
+			);
+		}
+	}
+
+	// Get cache statistics
+	async getCacheStats(): Promise<{
+		totalMessages: number;
+		totalSize: number;
+		oldestMessage: Date | undefined;
+	}> {
+		if (!this.db) {
+			return {totalMessages: 0, totalSize: 0, oldestMessage: undefined};
+		}
+
+		try {
+			const countStmt = this.db.prepare(
+				'SELECT COUNT(*) as count FROM messages',
+			);
+			const oldestStmt = this.db.prepare(
+				'SELECT MIN(last_fetched) as oldest FROM messages',
+			);
+
+			const {count} = countStmt.get() as {count: number};
+			const {oldest} = oldestStmt.get() as {oldest: number | undefined};
+
+			// Get database file size
+			const stats = fs.statSync(this.dbPath);
+
+			return {
+				totalMessages: count,
+				totalSize: stats.size,
+				oldestMessage: oldest ? new Date(oldest) : undefined,
+			};
+		} catch (error: unknown) {
+			debugLog(
+				LogLevel.ERROR,
+				'CacheService',
+				'Failed to get cache stats:',
+				error,
+			);
+			return {totalMessages: 0, totalSize: 0, oldestMessage: undefined};
+		}
+	}
+
+	// Get folder metadata from cache
+	async getFolderMetadata(
+		folderId: string,
+		accountId: string,
+	): Promise<{totalMessages: number; unreadCount: number} | undefined> {
+		if (!this.db) return undefined;
+
+		try {
+			const stmt = this.db.prepare(`
+				SELECT total_count, unread_count
+				FROM folders
+				WHERE id = ?
+			`);
+			const row = stmt.get(`${accountId}:${folderId}`) as
+				| {total_count: number; unread_count: number}
+				| undefined;
+
+			if (row) {
+				return {
+					totalMessages: row.total_count,
+					unreadCount: row.unread_count,
+				};
+			}
+
+			return undefined;
+		} catch (error: unknown) {
+			debugLog(
+				LogLevel.ERROR,
+				'CacheService',
+				'Failed to get folder metadata:',
+				error,
+			);
+			return undefined;
+		}
+	}
+
+	// Update message flags in cache
+	async updateMessageFlags(
+		uid: string,
+		folderId: string,
+		accountId: string,
+		flags: string[],
+	): Promise<void> {
+		if (!this.db) return;
+
+		try {
+			const stmt = this.db.prepare(`
+				UPDATE messages
+				SET flags = ?
+				WHERE uid = ? AND folder_id = ? AND account_id = ?
+			`);
+
+			stmt.run(flags.join(','), uid, folderId, accountId);
+			debugLog(
+				LogLevel.DEBUG,
+				'CacheService',
+				`Updated flags for message ${uid} in ${folderId}`,
+			);
+		} catch (error: unknown) {
+			debugLog(
+				LogLevel.ERROR,
+				'CacheService',
+				'Failed to update message flags:',
+				error,
+			);
+		}
+	}
+
+	// Close database connection
+	close(): void {
+		if (this.db) {
+			this.db.close();
+			this.db = undefined;
+			debugLog(LogLevel.INFO, 'CacheService', 'Database connection closed');
+		}
 	}
 
 	private initializeDatabase(): void {
@@ -78,7 +437,7 @@ export class CacheService {
 
 			// Create tables if they don't exist
 			this.createTables();
-		} catch (error) {
+		} catch (error: unknown) {
 			debugLog(
 				LogLevel.ERROR,
 				'CacheService',
@@ -86,7 +445,7 @@ export class CacheService {
 				error,
 			);
 			// Continue without cache if initialization fails
-			this.db = null;
+			this.db = undefined;
 		}
 	}
 
@@ -162,288 +521,6 @@ export class CacheService {
 		debugLog(LogLevel.INFO, 'CacheService', 'Database tables created/verified');
 	}
 
-	// Get cached messages for a folder
-	async getCachedMessages(
-		folderId: string,
-		accountId: string,
-		limit: number = 50,
-		offset: number = 0,
-	): Promise<EmailMessage[]> {
-		if (!this.db) return [];
-
-		try {
-			const stmt = this.db.prepare(`
-				SELECT * FROM messages
-				WHERE folder_id = ? AND account_id = ?
-				ORDER BY date DESC
-				LIMIT ? OFFSET ?
-			`);
-
-			const rows = stmt.all(
-				folderId,
-				accountId,
-				limit,
-				offset,
-			) as CachedMessage[];
-
-			// Get attachments for each message
-			const attachmentStmt = this.db.prepare(`
-				SELECT filename, content_type, size, content_id
-				FROM attachments
-				WHERE message_uid = ? AND folder_id = ? AND account_id = ?
-			`);
-
-			return rows.map(row => {
-				const attachments = attachmentStmt.all(
-					row.uid,
-					folderId,
-					accountId,
-				) as CachedAttachment[];
-
-				return this.cachedMessageToEmailMessage(row, attachments);
-			});
-		} catch (error) {
-			debugLog(
-				LogLevel.ERROR,
-				'CacheService',
-				'Failed to get cached messages:',
-				error,
-			);
-			return [];
-		}
-	}
-
-	// Update messages in cache
-	async updateMessages(
-		messages: EmailMessage[],
-		folderId: string,
-		accountId: string,
-	): Promise<void> {
-		if (!this.db) return;
-
-		const insertStmt = this.db.prepare(`
-			INSERT OR REPLACE INTO messages (
-				uid, folder_id, account_id, subject, from_name, from_address,
-				date, flags, preview, has_attachments, thread_count, last_fetched
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`);
-
-		// Prepare statement for inserting attachments
-		const insertAttachmentStmt = this.db.prepare(`
-			INSERT OR REPLACE INTO attachments (
-				message_uid, folder_id, account_id, filename, content_type, size, content_id
-			) VALUES (?, ?, ?, ?, ?, ?, ?)
-		`);
-
-		// Delete existing attachments for these messages before inserting new ones
-		const deleteAttachmentsStmt = this.db.prepare(`
-			DELETE FROM attachments WHERE message_uid = ? AND folder_id = ? AND account_id = ?
-		`);
-
-		const transaction = this.db.transaction((messages: EmailMessage[]) => {
-			const now = Date.now();
-			for (const msg of messages) {
-				const fromEmail = msg.from[0];
-				const preview = msg.body.text
-					? msg.body.text.substring(0, 200).replace(/\n/g, ' ').trim()
-					: '';
-
-				insertStmt.run(
-					msg.uid,
-					folderId,
-					accountId,
-					msg.subject || '(No subject)',
-					fromEmail?.name || '',
-					fromEmail?.address || '',
-					new Date(msg.date).getTime(),
-					msg.flags.join(','),
-					preview,
-					msg.attachments && msg.attachments.length > 0 ? 1 : 0,
-					msg.references ? msg.references.length : 0,
-					now,
-				);
-
-				// First, delete existing attachments for this message
-				deleteAttachmentsStmt.run(msg.uid, folderId, accountId);
-
-				// Then insert new attachments if any
-				if (msg.attachments && msg.attachments.length > 0) {
-					for (const attachment of msg.attachments) {
-						insertAttachmentStmt.run(
-							msg.uid,
-							folderId,
-							accountId,
-							attachment.filename || 'unnamed',
-							attachment.contentType || 'application/octet-stream',
-							attachment.size || 0,
-							attachment.contentId || null,
-						);
-					}
-				}
-			}
-		});
-
-		try {
-			transaction(messages);
-			debugLog(
-				LogLevel.INFO,
-				'CacheService',
-				`Updated ${messages.length} messages in cache`,
-			);
-		} catch (error) {
-			debugLog(
-				LogLevel.ERROR,
-				'CacheService',
-				'Failed to update messages:',
-				error,
-			);
-		}
-	}
-
-	// Get last sync time for a folder
-	async getLastSyncTime(
-		folderId: string,
-		accountId: string,
-	): Promise<Date | null> {
-		if (!this.db) return null;
-
-		try {
-			const stmt = this.db.prepare(`
-				SELECT MAX(last_fetched) as last_sync FROM messages 
-				WHERE folder_id = ? AND account_id = ?
-			`);
-
-			const result = stmt.get(folderId, accountId) as {
-				last_sync: number | null;
-			};
-			return result.last_sync ? new Date(result.last_sync) : null;
-		} catch (error) {
-			debugLog(
-				LogLevel.ERROR,
-				'CacheService',
-				'Failed to get last sync time:',
-				error,
-			);
-			return null;
-		}
-	}
-
-	// Update folder metadata
-	async updateFolderMetadata(
-		folderId: string,
-		accountId: string,
-		totalCount: number,
-		unreadCount: number,
-	): Promise<void> {
-		if (!this.db) return;
-
-		try {
-			const stmt = this.db.prepare(`
-				INSERT OR REPLACE INTO folders (id, account_id, name, last_sync, total_count, unread_count)
-				VALUES (?, ?, ?, ?, ?, ?)
-			`);
-
-			stmt.run(
-				`${accountId}:${folderId}`,
-				accountId,
-				folderId,
-				Date.now(),
-				totalCount,
-				unreadCount,
-			);
-		} catch (error) {
-			debugLog(
-				LogLevel.ERROR,
-				'CacheService',
-				'Failed to update folder metadata:',
-				error,
-			);
-		}
-	}
-
-	// Clear cache for a specific folder
-	async clearFolder(folderId: string, accountId: string): Promise<void> {
-		if (!this.db) return;
-
-		try {
-			const stmt = this.db.prepare(`
-				DELETE FROM messages WHERE folder_id = ? AND account_id = ?
-			`);
-			stmt.run(folderId, accountId);
-			debugLog(
-				LogLevel.INFO,
-				'CacheService',
-				`Cleared cache for folder ${folderId}`,
-			);
-		} catch (error) {
-			debugLog(
-				LogLevel.ERROR,
-				'CacheService',
-				'Failed to clear folder cache:',
-				error,
-			);
-		}
-	}
-
-	// Clear all cache
-	async clearAllCache(): Promise<void> {
-		if (!this.db) return;
-
-		try {
-			this.db.exec('DELETE FROM messages');
-			this.db.exec('DELETE FROM folders');
-			this.db.exec('DELETE FROM message_bodies');
-			debugLog(LogLevel.INFO, 'CacheService', 'Cleared all cache');
-		} catch (error) {
-			debugLog(
-				LogLevel.ERROR,
-				'CacheService',
-				'Failed to clear all cache:',
-				error,
-			);
-		}
-	}
-
-	// Get cache statistics
-	async getCacheStats(): Promise<{
-		totalMessages: number;
-		totalSize: number;
-		oldestMessage: Date | null;
-	}> {
-		if (!this.db) {
-			return {totalMessages: 0, totalSize: 0, oldestMessage: null};
-		}
-
-		try {
-			const countStmt = this.db.prepare(
-				'SELECT COUNT(*) as count FROM messages',
-			);
-			const oldestStmt = this.db.prepare(
-				'SELECT MIN(last_fetched) as oldest FROM messages',
-			);
-
-			const count = (countStmt.get() as {count: number}).count;
-			const oldest = (oldestStmt.get() as {oldest: number | null}).oldest;
-
-			// Get database file size
-			const stats = fs.statSync(this.dbPath);
-
-			return {
-				totalMessages: count,
-				totalSize: stats.size,
-				oldestMessage: oldest ? new Date(oldest) : null,
-			};
-		} catch (error) {
-			debugLog(
-				LogLevel.ERROR,
-				'CacheService',
-				'Failed to get cache stats:',
-				error,
-			);
-			return {totalMessages: 0, totalSize: 0, oldestMessage: null};
-		}
-	}
-
 	// Convert cached message to EmailMessage format
 	private cachedMessageToEmailMessage(
 		cached: CachedMessage,
@@ -475,87 +552,11 @@ export class CacheService {
 							filename: att.filename,
 							contentType: att.content_type,
 							size: att.size,
-							contentId: att.content_id || undefined,
+							contentId: att.content_id ?? undefined,
 					  }))
 					: undefined,
 			flags: cached.flags ? cached.flags.split(',') : [],
 			references: cached.thread_count > 0 ? [] : undefined,
 		};
-	}
-
-	// Get folder metadata from cache
-	async getFolderMetadata(
-		folderId: string,
-		accountId: string,
-	): Promise<{totalMessages: number; unreadCount: number} | null> {
-		if (!this.db) return null;
-
-		try {
-			const stmt = this.db.prepare(`
-				SELECT total_count, unread_count 
-				FROM folders 
-				WHERE id = ?
-			`);
-			const row = stmt.get(`${accountId}:${folderId}`) as
-				| {total_count: number; unread_count: number}
-				| undefined;
-
-			if (row) {
-				return {
-					totalMessages: row.total_count,
-					unreadCount: row.unread_count,
-				};
-			}
-			return null;
-		} catch (error) {
-			debugLog(
-				LogLevel.ERROR,
-				'CacheService',
-				'Failed to get folder metadata:',
-				error,
-			);
-			return null;
-		}
-	}
-
-	// Update message flags in cache
-	async updateMessageFlags(
-		uid: string,
-		folderId: string,
-		accountId: string,
-		flags: string[],
-	): Promise<void> {
-		if (!this.db) return;
-
-		try {
-			const stmt = this.db.prepare(`
-				UPDATE messages 
-				SET flags = ?
-				WHERE uid = ? AND folder_id = ? AND account_id = ?
-			`);
-
-			stmt.run(flags.join(','), uid, folderId, accountId);
-			debugLog(
-				LogLevel.DEBUG,
-				'CacheService',
-				`Updated flags for message ${uid} in ${folderId}`,
-			);
-		} catch (error) {
-			debugLog(
-				LogLevel.ERROR,
-				'CacheService',
-				'Failed to update message flags:',
-				error,
-			);
-		}
-	}
-
-	// Close database connection
-	close(): void {
-		if (this.db) {
-			this.db.close();
-			this.db = null;
-			debugLog(LogLevel.INFO, 'CacheService', 'Database connection closed');
-		}
 	}
 }

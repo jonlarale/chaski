@@ -1,25 +1,30 @@
 import React from 'react';
 import {Box, Text} from 'ink';
-import {AssistantMessage, AssistantStatus} from '../types/assistant.js';
+import type {AssistantMessage, AssistantStatus} from '../types/assistant.js';
 import {colors, spacing} from '../constants/index.js';
 
-interface AssistantPanelProps {
-	messages: AssistantMessage[];
-	status: AssistantStatus;
-	error?: string | null;
-}
+type AssistantPanelProps = {
+	readonly messages: AssistantMessage[];
+	readonly status: AssistantStatus;
+	readonly error?: string | undefined;
+};
 
-const statusLabel = (status: AssistantStatus, error?: string | null) => {
+const statusLabel = (status: AssistantStatus, error?: string | undefined) => {
 	switch (status) {
-		case 'thinking':
+		case 'thinking': {
 			return {color: colors.yellow, text: 'Contacting assistant…'};
-		case 'error':
+		}
+
+		case 'error': {
 			return {
 				color: colors.error,
-				text: error || 'Assistant could not complete the request.',
+				text: error ?? 'Assistant could not complete the request.',
 			};
-		default:
+		}
+
+		default: {
 			return {color: colors.textSecondary, text: 'Ready'};
+		}
 	}
 };
 
@@ -28,19 +33,12 @@ const roleLabel = {
 	assistant: {prefix: 'Chaski AI', color: colors.green},
 } as const;
 
-const AssistantPanel: React.FC<AssistantPanelProps> = ({
-	messages,
-	status,
-	error,
-}) => {
+function AssistantPanel({messages, status, error}: AssistantPanelProps) {
 	const recentMessages = messages.slice(-4);
 	const {color: statusColor, text: statusText} = statusLabel(status, error);
 
 	return (
 		<Box
-			flexDirection="column"
-			width="100%"
-			borderStyle="single"
 			borderColor={
 				status === 'error'
 					? colors.error
@@ -48,20 +46,24 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({
 					? colors.yellow
 					: colors.borderInactive
 			}
-			padding={1}
+			borderStyle="single"
+			flexDirection="column"
 			marginBottom={spacing.commandInput.margin}
+			padding={1}
+			width="100%"
 		>
 			<Box justifyContent="space-between" width="100%">
-				<Text color={colors.cyan} bold>
+				<Text bold color={colors.cyan}>
 					🤖 Chaski AI Assistant
 				</Text>
 				<Text color={statusColor}>{statusText}</Text>
 			</Box>
 
-			<Box flexDirection="column" marginTop={spacing.marginSM}>
+			<Box flexDirection="column" marginTop={spacing.marginSm}>
 				{recentMessages.length === 0 ? (
 					<Text color={colors.textPlaceholder}>
-						Type a question without a leading "/" to ask about your mail.
+						Type a question without a leading &quot;/&quot; to ask about your
+						mail.
 					</Text>
 				) : (
 					recentMessages.map(message => {
@@ -70,12 +72,12 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({
 							<Box
 								key={message.id}
 								flexDirection="column"
-								marginBottom={spacing.marginXS}
+								marginBottom={spacing.marginXs}
 							>
-								<Text color={role.color} bold>
+								<Text bold color={role.color}>
 									{role.prefix}
 								</Text>
-								<Text wrap="wrap" color={colors.textPrimary}>
+								<Text color={colors.textPrimary} wrap="wrap">
 									{message.content}
 								</Text>
 							</Box>
@@ -84,11 +86,11 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({
 				)}
 			</Box>
 
-			<Text color={colors.textSecondary} dimColor>
+			<Text dimColor color={colors.textSecondary}>
 				Tip: Use /assistant-clear to reset the conversation.
 			</Text>
 		</Box>
 	);
-};
+}
 
 export default AssistantPanel;

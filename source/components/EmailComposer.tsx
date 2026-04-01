@@ -1,32 +1,32 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Text, useInput, useStdout} from 'ink';
-import TextInput from './TextInput.js';
-import TextArea from './TextArea.js';
-import CommandBar from './CommandBar.js';
 import {colors, semanticColors, spacing} from '../constants/index.js';
+import TextArea from './TextArea.js';
+import TextInput from './TextInput.js';
+import CommandBar from './CommandBar.js';
 
-interface EmailComposerProps {
-	onSend: (email: ComposedEmail) => void;
-	onCancel: () => void;
-	replyTo?: {
+type EmailComposerProps = {
+	readonly onSend: (email: ComposedEmail) => void;
+	readonly onCancel: () => void;
+	readonly replyTo?: {
 		from: string;
 		subject: string;
 		date: string;
 		preview: string;
 	};
-	mode?: 'compose' | 'reply' | 'forward';
-	availableAccounts?: string[];
-	defaultAccount?: string;
-}
+	readonly mode?: 'compose' | 'reply' | 'forward';
+	readonly availableAccounts?: string[];
+	readonly defaultAccount?: string;
+};
 
-interface ComposedEmail {
+type ComposedEmail = {
 	from: string;
 	to: string;
 	cc: string;
 	subject: string;
 	body: string;
 	inReplyTo?: string;
-}
+};
 
 type FocusedField = 'from' | 'to' | 'cc' | 'subject' | 'body';
 
@@ -36,11 +36,11 @@ const isValidEmail = (email: string): boolean => {
 	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 	// Handle multiple emails separated by comma
-	const emails = email.split(',').map(e => e.trim());
-	return emails.every(e => !e || emailRegex.test(e));
+	const emails = email.split(',').map(event => event.trim());
+	return emails.every(event => !event || emailRegex.test(event));
 };
 
-const EmailComposer: React.FC<EmailComposerProps> = ({
+function EmailComposer({
 	onSend,
 	onCancel,
 	replyTo,
@@ -51,10 +51,10 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 		'personal@yahoo.com',
 	],
 	defaultAccount = 'example@gmail.com',
-}) => {
+}: EmailComposerProps) {
 	const [from, setFrom] = useState(defaultAccount);
 	const [selectedAccountIndex, setSelectedAccountIndex] = useState(
-		availableAccounts.indexOf(defaultAccount) >= 0
+		availableAccounts.includes(defaultAccount)
 			? availableAccounts.indexOf(defaultAccount)
 			: 0,
 	);
@@ -66,17 +66,20 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 				? replyTo.subject
 				: `Re: ${replyTo.subject}`;
 		}
+
 		if (mode === 'forward' && replyTo) {
 			return replyTo.subject.startsWith('Fwd: ')
 				? replyTo.subject
 				: `Fwd: ${replyTo.subject}`;
 		}
+
 		return '';
 	});
 	const [body, setBody] = useState(() => {
 		if ((mode === 'reply' || mode === 'forward') && replyTo) {
 			return `\n\n---\nOn ${replyTo.date}, ${replyTo.from} wrote:\n${replyTo.preview}`;
 		}
+
 		return '';
 	});
 	const [focusedField, setFocusedField] = useState<FocusedField>('from');
@@ -87,9 +90,9 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 
 	// Clear screen when component mounts and unmounts
 	useEffect(() => {
-		write('\x1b[2J\x1b[H');
+		write('\u001B[2J\u001B[H');
 		return () => {
-			write('\x1b[2J\x1b[H');
+			write('\u001B[2J\u001B[H');
 		};
 	}, [write]);
 
@@ -100,47 +103,75 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 			onCancel();
 		} else if (key.downArrow) {
 			// Down arrow to next field
-			if (focusedField === 'from') {
-				setFocusedField('to');
-			} else if (focusedField === 'to') {
-				setFocusedField('cc');
-			} else if (focusedField === 'cc') {
-				setFocusedField('subject');
-			} else if (focusedField === 'subject') {
-				setFocusedField('body');
-			} else {
-				setFocusedField('from');
+			switch (focusedField) {
+				case 'from': {
+					setFocusedField('to');
+					break;
+				}
+
+				case 'to': {
+					setFocusedField('cc');
+					break;
+				}
+
+				case 'cc': {
+					setFocusedField('subject');
+					break;
+				}
+
+				case 'subject': {
+					setFocusedField('body');
+					break;
+				}
+
+				default: {
+					setFocusedField('from');
+				}
 			}
 		} else if (key.upArrow) {
 			// Up arrow to previous field
-			if (focusedField === 'body') {
-				setFocusedField('subject');
-			} else if (focusedField === 'subject') {
-				setFocusedField('cc');
-			} else if (focusedField === 'cc') {
-				setFocusedField('to');
-			} else if (focusedField === 'to') {
-				setFocusedField('from');
-			} else {
-				setFocusedField('body');
+			switch (focusedField) {
+				case 'body': {
+					setFocusedField('subject');
+					break;
+				}
+
+				case 'subject': {
+					setFocusedField('cc');
+					break;
+				}
+
+				case 'cc': {
+					setFocusedField('to');
+					break;
+				}
+
+				case 'to': {
+					setFocusedField('from');
+					break;
+				}
+
+				default: {
+					setFocusedField('body');
+				}
 			}
 		} else if (focusedField === 'from' && (key.leftArrow || key.rightArrow)) {
 			// Handle account selection with arrow keys
 			if (key.leftArrow && selectedAccountIndex > 0) {
 				const newIndex = selectedAccountIndex - 1;
 				setSelectedAccountIndex(newIndex);
-				setFrom(availableAccounts[newIndex] || defaultAccount);
+				setFrom(availableAccounts[newIndex] ?? defaultAccount);
 			} else if (
 				key.rightArrow &&
 				selectedAccountIndex < availableAccounts.length - 1
 			) {
 				const newIndex = selectedAccountIndex + 1;
 				setSelectedAccountIndex(newIndex);
-				setFrom(availableAccounts[newIndex] || defaultAccount);
+				setFrom(availableAccounts[newIndex] ?? defaultAccount);
 			}
 		} else if (key.ctrl && input === 's') {
 			// Ctrl+S to send
-			handleSend();
+			void handleSend();
 		}
 	});
 
@@ -206,12 +237,17 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 
 	const getModeTitle = () => {
 		switch (mode) {
-			case 'reply':
+			case 'reply': {
 				return '↩️  Reply to Email';
-			case 'forward':
+			}
+
+			case 'forward': {
 				return '➡️  Forward Email';
-			default:
+			}
+
+			default: {
 				return '✉️  Compose New Email';
+			}
 		}
 	};
 
@@ -219,11 +255,11 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 		<Box flexDirection="column" height="100%">
 			{/* Header */}
 			<Box
-				borderStyle="single"
-				borderBottom={true}
-				borderTop={false}
+				borderBottom
 				borderLeft={false}
 				borderRight={false}
+				borderStyle="single"
+				borderTop={false}
 				padding={1}
 			>
 				<Box justifyContent="space-between">
@@ -235,14 +271,14 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 			</Box>
 
 			{/* Form */}
-			<Box flexDirection="column" padding={2} flexGrow={1}>
+			<Box flexDirection="column" flexGrow={1} padding={2}>
 				{/* From field */}
 				<Box
-					marginBottom={spacing.composer.fieldMarginBottom}
-					flexDirection="row"
 					alignItems="center"
-					borderStyle={focusedField === 'from' ? 'single' : undefined}
 					borderColor={focusedField === 'from' ? colors.blue : undefined}
+					borderStyle={focusedField === 'from' ? 'single' : undefined}
+					flexDirection="row"
+					marginBottom={spacing.composer.fieldMarginBottom}
 					paddingX={focusedField === 'from' ? 1 : 0}
 				>
 					<Box width={spacing.composer.labelWidth}>
@@ -261,12 +297,12 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 						{availableAccounts.map((account, index) => (
 							<Box key={account} marginRight={2}>
 								<Text
+									bold={index === selectedAccountIndex}
 									color={
 										index === selectedAccountIndex
 											? semanticColors.composer.selectedAccount
 											: colors.gray
 									}
-									bold={index === selectedAccountIndex}
 								>
 									{index === selectedAccountIndex ? '[' : ' '}
 									{account}
@@ -276,7 +312,7 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 						))}
 					</Box>
 					{focusedField === 'from' && (
-						<Text color={colors.darkGray} dimColor>
+						<Text dimColor color={colors.darkGray}>
 							{' '}
 							(use ← → to select)
 						</Text>
@@ -285,12 +321,12 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 
 				{/* To field */}
 				<Box
-					marginBottom={spacing.composer.fieldMarginBottom}
-					borderStyle={focusedField === 'to' ? 'single' : undefined}
 					borderColor={focusedField === 'to' ? colors.blue : undefined}
+					borderStyle={focusedField === 'to' ? 'single' : undefined}
+					marginBottom={spacing.composer.fieldMarginBottom}
 					paddingX={focusedField === 'to' ? 1 : 0}
 				>
-					<Box flexDirection="row" alignItems="center">
+					<Box alignItems="center" flexDirection="row">
 						<Box width={spacing.composer.labelWidth}>
 							<Text
 								bold
@@ -303,14 +339,14 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 								To:
 							</Text>
 						</Box>
-						<Box flexGrow={1} flexDirection="row" alignItems="center">
+						<Box alignItems="center" flexDirection="row" flexGrow={1}>
 							<TextInput
-								value={to}
-								onChange={setTo}
+								isFocus={focusedField === 'to'}
 								placeholder="email@example.com, another@example.com"
-								focus={focusedField === 'to'}
-								onSubmit={handleToSubmit}
+								value={to}
 								width={50}
+								onChange={setTo}
+								onSubmit={handleToSubmit}
 							/>
 							{to && !isValidEmail(to) && (
 								<Box marginLeft={1}>
@@ -332,12 +368,12 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 
 				{/* CC field */}
 				<Box
-					marginBottom={spacing.composer.fieldMarginBottom}
-					borderStyle={focusedField === 'cc' ? 'single' : undefined}
 					borderColor={focusedField === 'cc' ? colors.blue : undefined}
+					borderStyle={focusedField === 'cc' ? 'single' : undefined}
+					marginBottom={spacing.composer.fieldMarginBottom}
 					paddingX={focusedField === 'cc' ? 1 : 0}
 				>
-					<Box flexDirection="row" alignItems="center">
+					<Box alignItems="center" flexDirection="row">
 						<Box width={spacing.composer.labelWidth}>
 							<Text
 								bold
@@ -350,14 +386,14 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 								CC:
 							</Text>
 						</Box>
-						<Box flexGrow={1} flexDirection="row" alignItems="center">
+						<Box alignItems="center" flexDirection="row" flexGrow={1}>
 							<TextInput
-								value={cc}
-								onChange={setCc}
+								isFocus={focusedField === 'cc'}
 								placeholder="cc@example.com, another@cc.com (optional)"
-								focus={focusedField === 'cc'}
-								onSubmit={handleCcSubmit}
+								value={cc}
 								width={50}
+								onChange={setCc}
+								onSubmit={handleCcSubmit}
 							/>
 							{cc && !isValidEmail(cc) && (
 								<Box marginLeft={1}>
@@ -372,12 +408,12 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 
 				{/* Subject field */}
 				<Box
-					marginBottom={spacing.composer.fieldMarginBottom}
-					borderStyle={focusedField === 'subject' ? 'single' : undefined}
 					borderColor={focusedField === 'subject' ? colors.blue : undefined}
+					borderStyle={focusedField === 'subject' ? 'single' : undefined}
+					marginBottom={spacing.composer.fieldMarginBottom}
 					paddingX={focusedField === 'subject' ? 1 : 0}
 				>
-					<Box flexDirection="row" alignItems="center">
+					<Box alignItems="center" flexDirection="row">
 						<Box width={spacing.composer.labelWidth}>
 							<Text
 								bold
@@ -390,14 +426,14 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 								Subject:
 							</Text>
 						</Box>
-						<Box flexGrow={1} flexDirection="row" alignItems="center">
+						<Box alignItems="center" flexDirection="row" flexGrow={1}>
 							<TextInput
-								value={subject}
-								onChange={setSubject}
+								isFocus={focusedField === 'subject'}
 								placeholder="Email subject"
-								focus={focusedField === 'subject'}
-								onSubmit={handleSubjectSubmit}
+								value={subject}
 								width={50}
+								onChange={setSubject}
+								onSubmit={handleSubjectSubmit}
 							/>
 							{!subject && focusedField === 'subject' && (
 								<Box marginLeft={1}>
@@ -412,11 +448,11 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 
 				{/* Body field */}
 				<Box
-					marginTop={spacing.marginSM}
+					borderColor={focusedField === 'body' ? colors.blue : undefined}
+					borderStyle={focusedField === 'body' ? 'single' : undefined}
 					flexDirection="column"
 					flexGrow={1}
-					borderStyle={focusedField === 'body' ? 'single' : undefined}
-					borderColor={focusedField === 'body' ? colors.blue : undefined}
+					marginTop={spacing.marginSm}
 					padding={focusedField === 'body' ? 1 : 0}
 				>
 					<Text
@@ -429,22 +465,26 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 					>
 						Message:
 					</Text>
-					<Box marginTop={spacing.marginSM}>
+					<Box marginTop={spacing.marginSm}>
 						<TextArea
-							value={body}
-							onChange={setBody}
-							placeholder="Type your message here..."
-							focus={focusedField === 'body'}
+							isFocus={focusedField === 'body'}
 							height={10}
+							placeholder="Type your message here..."
+							value={body}
 							width={60}
-							onUpArrowAtTop={() => setFocusedField('subject')}
-							onDownArrowAtBottom={() => setFocusedField('from')}
+							onChange={setBody}
+							onDownArrowAtBottom={() => {
+								setFocusedField('from');
+							}}
+							onUpArrowAtTop={() => {
+								setFocusedField('subject');
+							}}
 						/>
 					</Box>
 				</Box>
 
 				{/* Validation warnings */}
-				<Box marginTop={spacing.marginSM} flexDirection="column">
+				<Box flexDirection="column" marginTop={spacing.marginSm}>
 					{!to && (
 						<Text color={semanticColors.composer.validation.warning}>
 							⚠ Please enter a recipient
@@ -475,7 +515,6 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 
 			{/* Footer */}
 			<CommandBar
-				onQuit={onCancel}
 				view="compose"
 				commands={[
 					{key: '↑↓', label: 'Navigate', action: 'navigate'},
@@ -486,6 +525,6 @@ const EmailComposer: React.FC<EmailComposerProps> = ({
 			/>
 		</Box>
 	);
-};
+}
 
 export default EmailComposer;

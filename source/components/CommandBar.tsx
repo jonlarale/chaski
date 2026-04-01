@@ -1,20 +1,20 @@
+import process from 'node:process';
 import React from 'react';
 import {Box, Text} from 'ink';
 import {colors} from '../constants/index.js';
 
-interface CommandItem {
+type CommandItem = {
 	key: string;
 	label: string;
 	color?: string;
 	action?: 'navigate' | 'select' | 'back' | 'quit' | 'primary' | 'secondary';
-}
+};
 
-interface CommandBarProps {
-	onQuit?: () => void;
-	commandInputActive?: boolean;
-	commands: CommandItem[];
-	view: 'main' | 'email' | 'compose' | 'thread';
-}
+type CommandBarProps = {
+	readonly isCommandInputActive?: boolean;
+	readonly commands: CommandItem[];
+	readonly view: 'main' | 'email' | 'compose' | 'thread';
+};
 
 // Detect platform for modifier key display
 const isMac = process.platform === 'darwin';
@@ -30,29 +30,29 @@ const actionColors: Record<string, string> = {
 	secondary: colors.magenta,
 };
 
-const CommandBar: React.FC<CommandBarProps> = ({
-	commandInputActive = false,
+function CommandBar({
+	isCommandInputActive = false,
 	commands,
 	view,
-}) => {
+}: CommandBarProps) {
 	// Remove useInput from CommandBar to avoid conflicts
 	// ESC handling should only be in App.tsx
 
 	return (
 		<Box>
-			<Box borderStyle="single" borderTop={true} paddingX={1} width="100%">
-				<Box justifyContent="center" paddingX={1} width={'100%'}>
+			<Box borderTop borderStyle="single" paddingX={1} width="100%">
+				<Box justifyContent="center" paddingX={1} width="100%">
 					<Box flexDirection="row">
 						{commands.map((cmd, index) => {
 							// Replace Ctrl with platform-specific modifier
 							const displayKey = cmd.key.replace(/Ctrl/g, modifierKey);
 
 							return (
-								<Box key={`${cmd.key}-${index}`} flexDirection="row">
+								<Box key={cmd.key} flexDirection="row">
 									{index > 0 && <Text color={colors.darkGray}> • </Text>}
 									<Text
-										color={cmd.color || actionColors[cmd.action || 'navigate']}
 										bold
+										color={cmd.color ?? actionColors[cmd.action ?? 'navigate']}
 									>
 										{displayKey}
 									</Text>
@@ -60,10 +60,10 @@ const CommandBar: React.FC<CommandBarProps> = ({
 								</Box>
 							);
 						})}
-						{view === 'main' && !commandInputActive && (
+						{view === 'main' && !isCommandInputActive && (
 							<Box flexDirection="row">
 								<Text color={colors.darkGray}> • </Text>
-								<Text color={colors.blue} bold>
+								<Text bold color={colors.blue}>
 									Tab
 								</Text>
 								<Text color={colors.white}> Commands</Text>
@@ -75,6 +75,6 @@ const CommandBar: React.FC<CommandBarProps> = ({
 			<Box height={1} />
 		</Box>
 	);
-};
+}
 
 export default CommandBar;

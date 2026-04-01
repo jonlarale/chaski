@@ -1,4 +1,16 @@
-export interface EmailAccount {
+import type {Buffer} from 'node:buffer';
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export type OAuth2Config = {
+	provider: 'google' | 'microsoft';
+	clientId: string;
+	clientSecret?: string;
+	refreshToken?: string;
+	accessToken?: string;
+	tokenExpiry?: Date;
+};
+
+export type EmailAccount = {
 	id: string;
 	email: string;
 	displayName: string;
@@ -7,34 +19,25 @@ export interface EmailAccount {
 	imapConfig?: ImapConfig;
 	smtpConfig?: SmtpConfig;
 	oauth2Config?: OAuth2Config;
-}
+};
 
-export interface ImapConfig {
+export type ImapConfig = {
 	host: string;
 	port: number;
 	secure: boolean;
 	username?: string;
 	password?: string;
-}
+};
 
-export interface SmtpConfig {
+export type SmtpConfig = {
 	host: string;
 	port: number;
 	secure: boolean;
 	username?: string;
 	password?: string;
-}
+};
 
-export interface OAuth2Config {
-	provider: 'google' | 'microsoft';
-	clientId: string;
-	clientSecret?: string;
-	refreshToken?: string;
-	accessToken?: string;
-	tokenExpiry?: Date;
-}
-
-export interface EmailMessage {
+export type EmailMessage = {
 	id: string;
 	accountId: string;
 	folder: string;
@@ -56,25 +59,25 @@ export interface EmailMessage {
 	threadId?: string;
 	inReplyTo?: string;
 	references?: string[];
-}
+};
 
-export interface EmailAddress {
+export type EmailAddress = {
 	name?: string;
 	address: string;
-}
+};
 
-export interface Attachment {
+export type Attachment = {
 	filename: string;
 	contentType: string;
 	size: number;
 	contentId?: string;
 	content?: Buffer;
-}
+};
 
-export interface EmailFolder {
+export type EmailFolder = {
 	name: string;
 	displayName: string;
 	specialUse?: string;
 	delimiter: string;
 	children?: EmailFolder[];
-}
+};

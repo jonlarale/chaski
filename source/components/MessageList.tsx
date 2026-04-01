@@ -1,14 +1,15 @@
+import type {Buffer} from 'node:buffer';
 import React, {useState, useEffect, useRef} from 'react';
 import {Box, Text, useInput, useStdout} from 'ink';
-import {EmailService} from '../services/emailService.js';
-import {SettingsService} from '../services/settingsService.js';
-import {CacheService} from '../services/cacheService.js';
-import {EmailAccount, EmailMessage} from '../types/email.js';
-import {RefreshStatus} from '../types/refresh.js';
+import type {EmailService} from '../services/emailService.js';
+import type {SettingsService} from '../services/settingsService.js';
+import type {CacheService} from '../services/cacheService.js';
+import type {EmailAccount, EmailMessage} from '../types/email.js';
+import type {RefreshStatus} from '../types/refresh.js';
 import {useDebug} from '../utils/debug.js';
 import {colors, semanticColors, spacing} from '../constants/index.js';
 
-interface Message {
+type Message = {
 	id: string;
 	from: string;
 	subject: string;
@@ -29,23 +30,23 @@ interface Message {
 	}>;
 	// Store original EmailMessage for conversion back
 	_original?: EmailMessage;
-}
+};
 
-interface MessageListProps {
-	folder: string;
-	account?: string;
-	hasFocus: boolean;
-	hasNavigated: boolean; // To know if user has navigated/expanded any folder
-	onEmailOpen: (message: Message) => void;
-	onThreadOpen?: (message: Message) => void;
-	emailService: EmailService;
-	emailAccounts: EmailAccount[];
-	settingsService: SettingsService;
-	cacheService: CacheService;
-	refreshStatus?: RefreshStatus;
-	onRefreshRequest?: (scope: 'current' | 'all' | 'inbox') => void;
-	refreshTrigger?: number;
-}
+type MessageListProps = {
+	readonly folder: string;
+	readonly account?: string;
+	readonly hasFocus: boolean;
+	readonly hasNavigated: boolean; // To know if user has navigated/expanded any folder
+	readonly onEmailOpen: (message: Message) => void;
+	readonly onThreadOpen?: (message: Message) => void;
+	readonly emailService: EmailService;
+	readonly emailAccounts: EmailAccount[];
+	readonly settingsService: SettingsService;
+	readonly cacheService: CacheService;
+	readonly refreshStatus?: RefreshStatus;
+	readonly onRefreshRequest?: (scope: 'current' | 'all' | 'inbox') => void;
+	readonly refreshTrigger?: number;
+};
 
 // Format date with relative dates (Today, Yesterday)
 const formatRelativeDate = (date: Date): string => {
@@ -62,15 +63,17 @@ const formatRelativeDate = (date: Date): string => {
 
 	if (messageDate.getTime() === today.getTime()) {
 		return 'Today';
-	} else if (messageDate.getTime() === yesterday.getTime()) {
-		return 'Yesterday';
-	} else {
-		return date.toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: '2-digit',
-			day: '2-digit',
-		});
 	}
+
+	if (messageDate.getTime() === yesterday.getTime()) {
+		return 'Yesterday';
+	}
+
+	return date.toLocaleDateString('en-US', {
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+	});
 };
 
 // Convert EmailMessage to Message interface
@@ -78,11 +81,11 @@ const convertEmailMessage = (email: EmailMessage): Message => {
 	const from = email.from[0];
 	const fromString = from?.name
 		? `${from.name} <${from.address}>`
-		: from?.address || 'Unknown';
+		: from?.address ?? 'Unknown';
 
 	// Get text preview
 	const preview = email.body.text
-		? email.body.text.substring(0, 100).replace(/\n/g, ' ').trim() + '...'
+		? email.body.text.slice(0, 100).replace(/\n/g, ' ').trim() + '...'
 		: 'No preview available';
 
 	// Check if message is read based on flags
@@ -116,14 +119,13 @@ const formatCount = (count: number): string => {
 };
 
 // Format cache age for display
-const formatCacheAge = (lastSync: Date | null): string => {
+const formatCacheAge = (lastSync: Date | undefined): string => {
 	if (!lastSync) return 'Not synced';
 
-	const now = new Date();
-	const diffMs = now.getTime() - lastSync.getTime();
-	const diffMins = Math.floor(diffMs / 60000);
-	const diffHours = Math.floor(diffMs / 3600000);
-	const diffDays = Math.floor(diffMs / 86400000);
+	const diffMs = Date.now() - lastSync.getTime();
+	const diffMins = Math.floor(diffMs / 60_000);
+	const diffHours = Math.floor(diffMs / 3_600_000);
+	const diffDays = Math.floor(diffMs / 86_400_000);
 
 	if (diffMins < 1) return 'Just now';
 	if (diffMins < 60) return `${diffMins}m ago`;
@@ -131,7 +133,7 @@ const formatCacheAge = (lastSync: Date | null): string => {
 	return `${diffDays}d ago`;
 };
 
-const MessageList: React.FC<MessageListProps> = ({
+function MessageList({
 	folder,
 	account,
 	hasFocus,
@@ -145,28 +147,29 @@ const MessageList: React.FC<MessageListProps> = ({
 	refreshStatus,
 	onRefreshRequest,
 	refreshTrigger,
-}) => {
+}: MessageListProps) {
 	const debug = useDebug('MessageList');
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [messages, setMessages] = useState<Message[]>([]);
 	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+	const [error, setError] = useState<string | undefined>(undefined);
 	const [currentPage, setCurrentPage] = useState(1);
 	const [totalMessages, setTotalMessages] = useState(0);
-	const [_messageCache, setMessageCache] = useState<{[key: string]: Message[]}>(
+	const [messageCache, setMessageCache] = useState<Record<string, Message[]>>(
 		{},
 	);
+	void messageCache; // Used only for caching, state setter used elsewhere
 	const [isChangingPage, setIsChangingPage] = useState(false);
 	const [viewportOffset, setViewportOffset] = useState(0);
-	const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+	const [lastSyncTime, setLastSyncTime] = useState<Date | undefined>(undefined);
 	const [isFromCache, setIsFromCache] = useState(false);
 	const [newMessageCount, setNewMessageCount] = useState(0);
-	const [lastMessageUIDs, setLastMessageUIDs] = useState<Set<number>>(
+	const [lastMessageUids, setLastMessageUids] = useState<Set<number>>(
 		new Set(),
 	);
 	const {stdout} = useStdout();
-	const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
-	const lastAutoRefreshRef = useRef<Date | null>(null);
+	const autoRefreshIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
+	const lastAutoRefreshRef = useRef<Date | undefined>(undefined);
 
 	const messagesPerPage = settingsService.getMessagesPerPage();
 	const totalPages = Math.ceil(totalMessages / messagesPerPage);
@@ -184,7 +187,7 @@ const MessageList: React.FC<MessageListProps> = ({
 		setViewportOffset(0);
 		setMessageCache({});
 		setTotalMessages(0);
-		lastAutoRefreshRef.current = null;
+		lastAutoRefreshRef.current = undefined;
 	}, [folder, account]);
 
 	// Set up auto-refresh interval
@@ -192,7 +195,7 @@ const MessageList: React.FC<MessageListProps> = ({
 		// Clear any existing interval
 		if (autoRefreshIntervalRef.current) {
 			clearInterval(autoRefreshIntervalRef.current);
-			autoRefreshIntervalRef.current = null;
+			autoRefreshIntervalRef.current = undefined;
 		}
 
 		// Only set up interval if auto-refresh is enabled and we have focus
@@ -231,7 +234,7 @@ const MessageList: React.FC<MessageListProps> = ({
 		return () => {
 			if (autoRefreshIntervalRef.current) {
 				clearInterval(autoRefreshIntervalRef.current);
-				autoRefreshIntervalRef.current = null;
+				autoRefreshIntervalRef.current = undefined;
 			}
 		};
 	}, [
@@ -248,23 +251,26 @@ const MessageList: React.FC<MessageListProps> = ({
 	useEffect(() => {
 		if (refreshTrigger && refreshTrigger > 0 && messages.length > 0) {
 			// After a refresh, check if we have new messages
-			const currentUIDs = new Set(
+			const currentUids = new Set(
 				messages
 					.map(m => m._original?.uid)
 					.filter((uid): uid is number => uid !== undefined),
 			);
 
-			if (lastMessageUIDs.size > 0) {
-				const newUIDs = Array.from(currentUIDs).filter(
-					uid => !lastMessageUIDs.has(uid),
+			if (lastMessageUids.size > 0) {
+				const newUids = [...currentUids].filter(
+					uid => !lastMessageUids.has(uid),
 				);
-				if (newUIDs.length > 0) {
-					setNewMessageCount(newUIDs.length);
+				if (newUids.length > 0) {
+					setNewMessageCount(newUids.length);
 					// Clear the notification after 5 seconds
-					setTimeout(() => setNewMessageCount(0), 5000);
+					setTimeout(() => {
+						setNewMessageCount(0);
+					}, 5000);
 				}
 			}
-			setLastMessageUIDs(currentUIDs);
+
+			setLastMessageUids(currentUids);
 		}
 	}, [refreshTrigger, messages]);
 
@@ -295,8 +301,7 @@ const MessageList: React.FC<MessageListProps> = ({
 					const intervalMinutes = settingsService.getAutoRefreshInterval();
 					const shouldAutoRefresh =
 						!syncTime ||
-						new Date().getTime() - syncTime.getTime() >
-							intervalMinutes * 60 * 1000;
+						Date.now() - syncTime.getTime() > intervalMinutes * 60 * 1000;
 
 					if (shouldAutoRefresh && !refreshStatus?.isRefreshing) {
 						debug.info('Initial auto-refresh on folder load', {
@@ -309,6 +314,7 @@ const MessageList: React.FC<MessageListProps> = ({
 					}
 				}
 			}
+
 			// First, try to load from SQLite cache
 			try {
 				const emailAccount = emailAccounts.find(acc => acc.email === account);
@@ -327,7 +333,9 @@ const MessageList: React.FC<MessageListProps> = ({
 
 				if (cachedMessages.length > 0) {
 					// Show cached messages immediately
-					const convertedMessages = cachedMessages.map(convertEmailMessage);
+					const convertedMessages = cachedMessages.map(m =>
+						convertEmailMessage(m),
+					);
 
 					setMessages(convertedMessages);
 					setIsFromCache(true);
@@ -379,18 +387,19 @@ const MessageList: React.FC<MessageListProps> = ({
 							debug.info('No cache metadata, triggering immediate refresh');
 							onRefreshRequest('current');
 						}
+
 						setTotalMessages(0);
 					}
 
 					debug.info('Loaded from cache', {
 						count: cachedMessages.length,
 						lastSync: syncTime,
-						totalMessages: metadata?.totalMessages || 0,
+						totalMessages: metadata?.totalMessages ?? 0,
 					});
 
 					// Check if cache has incomplete data
 					const totalPages = Math.ceil(
-						(metadata?.totalMessages || 0) / messagesPerPage,
+						(metadata?.totalMessages ?? 0) / messagesPerPage,
 					);
 					const isLastPage = currentPage >= totalPages;
 
@@ -409,13 +418,13 @@ const MessageList: React.FC<MessageListProps> = ({
 						return;
 					}
 				}
-			} catch (err) {
-				debug.warn('Failed to load from cache', err);
+			} catch (error_: unknown) {
+				debug.warn('Failed to load from cache', error_);
 			}
 
 			// If no cache or cache failed, load from IMAP
 			setLoading(true);
-			setError(null);
+			setError(undefined);
 			setIsFromCache(false);
 
 			try {
@@ -474,8 +483,8 @@ const MessageList: React.FC<MessageListProps> = ({
 					actualTotalMessages = folderStatus.total;
 					maxSequenceNumber = folderStatus.maxSequence;
 					setTotalMessages(folderStatus.total);
-				} catch (err) {
-					console.error('Failed to get folder status:', err);
+				} catch (error_: unknown) {
+					console.error('Failed to get folder status:', error_);
 					// If we can't get status and don't have a total, estimate
 					if (totalMessages === 0) {
 						actualTotalMessages = 100;
@@ -509,8 +518,9 @@ const MessageList: React.FC<MessageListProps> = ({
 					maxSequenceNumber - (currentPage - 1) * messagesPerPage,
 				);
 
-				// Fetch 50% more messages to account for gaps
-				const bufferSize = Math.ceil(messagesPerPage * 1.5);
+				// Fetch 3x more messages to account for gaps from deleted messages
+				// This ensures we get enough messages even with significant gaps
+				const bufferSize = Math.ceil(messagesPerPage * 3);
 				const startSeq = Math.max(1, endSeq - bufferSize + 1);
 
 				// Ensure valid sequence range
@@ -547,14 +557,16 @@ const MessageList: React.FC<MessageListProps> = ({
 				// Log first and last message dates for debugging
 				if (messagesForPage.length > 0) {
 					console.log(`Page ${currentPage} messages date range:`, {
-						newest: messagesForPage[0]?.date || 'N/A',
-						oldest: messagesForPage[messagesForPage.length - 1]?.date || 'N/A',
+						newest: messagesForPage[0]?.date ?? 'N/A',
+						oldest: messagesForPage[messagesForPage.length - 1]?.date ?? 'N/A',
 						count: messagesForPage.length,
 					});
 				}
 
 				// Convert to Message format
-				const convertedMessages = messagesForPage.map(convertEmailMessage);
+				const convertedMessages = messagesForPage.map(m =>
+					convertEmailMessage(m),
+				);
 				setMessages(convertedMessages);
 
 				// Update SQLite cache with new messages (only cache the page we're showing)
@@ -575,14 +587,17 @@ const MessageList: React.FC<MessageListProps> = ({
 
 				// Cache the results in memory too
 				const cacheKey = `${account}-${folder}-${currentPage}`;
-				setMessageCache(prev => ({
-					...prev,
+				setMessageCache(previous => ({
+					...previous,
 					[cacheKey]: convertedMessages,
 				}));
-			} catch (err) {
-				console.error(`Failed to load messages for ${account}/${folder}:`, err);
+			} catch (error_: unknown) {
+				console.error(
+					`Failed to load messages for ${account}/${folder}:`,
+					error_,
+				);
 				setError(
-					err instanceof Error ? err.message : 'Failed to load messages',
+					error_ instanceof Error ? error_.message : 'Failed to load messages',
 				);
 				setMessages([]);
 			} finally {
@@ -598,7 +613,7 @@ const MessageList: React.FC<MessageListProps> = ({
 				setLoading(false);
 				setError('Loading timed out');
 			}
-		}, 10000); // 10 second timeout
+		}, 10_000); // 10 second timeout
 
 		loadMessages().finally(() => {
 			clearTimeout(timeoutId);
@@ -663,7 +678,7 @@ const MessageList: React.FC<MessageListProps> = ({
 			if (message) {
 				debug.info('Opening message', {
 					id: message.id,
-					hasThread: !!message.threadCount,
+					hasThread: Boolean(message.threadCount),
 				});
 				if (message.threadCount && message.threadCount > 0 && onThreadOpen) {
 					onThreadOpen(message);
@@ -766,44 +781,58 @@ const MessageList: React.FC<MessageListProps> = ({
 	useEffect(() => {
 		if (loading || refreshStatus?.isRefreshing) {
 			const interval = setInterval(() => {
-				setLoadingDots(prev => {
-					if (prev === '') return '.';
-					if (prev === '.') return '..';
-					if (prev === '..') return '...';
+				setLoadingDots(previous => {
+					if (previous === '') return '.';
+					if (previous === '.') return '..';
+					if (previous === '..') return '...';
 					return '';
 				});
 			}, 400);
-			return () => clearInterval(interval);
+			return () => {
+				clearInterval(interval);
+			};
 		}
+
 		return undefined;
 	}, [loading, refreshStatus?.isRefreshing]);
 
-	const getFolderDisplayName = (folder: string, account?: string) => {
-		if (account) {
+	const getFolderDisplayName = (folderName: string, accountName?: string) => {
+		if (accountName) {
 			// Show specific account
-			return `${account}`;
-		} else {
-			// Show general folder (when no account selected)
-			switch (folder) {
-				case 'INBOX':
-					return 'All Inboxes';
-				case 'SENT':
-					return 'All Sent';
-				case 'DRAFTS':
-					return 'All Drafts';
-				case 'SPAM':
-					return 'All Spam';
-				case 'TRASH':
-					return 'All Trash';
-				default:
-					return folder;
+			return accountName;
+		}
+
+		// Show general folder (when no account selected)
+		switch (folderName) {
+			case 'INBOX': {
+				return 'All Inboxes';
+			}
+
+			case 'SENT': {
+				return 'All Sent';
+			}
+
+			case 'DRAFTS': {
+				return 'All Drafts';
+			}
+
+			case 'SPAM': {
+				return 'All Spam';
+			}
+
+			case 'TRASH': {
+				return 'All Trash';
+			}
+
+			default: {
+				return folderName;
 			}
 		}
 	};
 
 	// If no folder has been expanded, show nothing
 	if (!hasNavigated) {
-		return <Box padding={1}></Box>;
+		return <Box padding={1} />;
 	}
 
 	// Show loading state with animation - but only if we don't have cache
@@ -819,16 +848,16 @@ const MessageList: React.FC<MessageListProps> = ({
 					{totalPages > 1 && `[Page ${currentPage}/${totalPages}] `}
 					{hasFocus && '◀'}
 				</Text>
-				<Box marginTop={spacing.marginSM} flexDirection="column">
+				<Box marginTop={spacing.marginSm} flexDirection="column">
 					<Text color={colors.yellow}>
-						{refreshStatus?.message ||
+						{refreshStatus?.message ??
 							(isChangingPage
 								? `Loading page ${currentPage}`
 								: 'Connecting to email server')}
 						{loadingDots}
 					</Text>
-					<Box marginTop={spacing.marginXS}>
-						<Text color={colors.gray} dimColor>
+					<Box marginTop={spacing.marginXs}>
+						<Text dimColor color={colors.gray}>
 							This may take a moment on first load
 						</Text>
 					</Box>
@@ -873,7 +902,7 @@ const MessageList: React.FC<MessageListProps> = ({
 				>
 					📧 {getFolderDisplayName(folder, account)} (0) {hasFocus && '◀'}
 				</Text>
-				<Box marginTop={spacing.marginSM}>
+				<Box marginTop={spacing.marginSm}>
 					<Text color={colors.gray}>No messages in {account}</Text>
 				</Box>
 			</Box>
@@ -906,7 +935,7 @@ const MessageList: React.FC<MessageListProps> = ({
 				)}
 				{refreshStatus?.isRefreshing && (
 					<Text color={colors.yellow}>
-						{refreshStatus.message || 'Syncing'}
+						{refreshStatus.message ?? 'Syncing'}
 						{loadingDots}{' '}
 					</Text>
 				)}
@@ -916,7 +945,7 @@ const MessageList: React.FC<MessageListProps> = ({
 				{/* Scroll indicator - more messages above */}
 				{viewportOffset > 0 && (
 					<Box marginBottom={0}>
-						<Text color={colors.gray} dimColor>
+						<Text dimColor color={colors.gray}>
 							▲ {viewportOffset} more message{viewportOffset > 1 ? 's' : ''}{' '}
 							above
 						</Text>
@@ -960,9 +989,9 @@ const MessageList: React.FC<MessageListProps> = ({
 											color={
 												isSelected
 													? colors.white
-													: !message.read
-													? semanticColors.message.fromUnread
-													: semanticColors.message.from
+													: message.read
+													? semanticColors.message.from
+													: semanticColors.message.fromUnread
 											}
 											backgroundColor={
 												isSelected ? semanticColors.folder.selected : undefined
@@ -1039,7 +1068,7 @@ const MessageList: React.FC<MessageListProps> = ({
 				{/* Scroll indicator - more messages below */}
 				{viewportOffset + visibleItems < messages.length && (
 					<Box marginTop={0}>
-						<Text color={colors.gray} dimColor>
+						<Text dimColor color={colors.gray}>
 							▼ {messages.length - viewportOffset - visibleItems} more message
 							{messages.length - viewportOffset - visibleItems > 1
 								? 's'
@@ -1051,6 +1080,6 @@ const MessageList: React.FC<MessageListProps> = ({
 			</Box>
 		</Box>
 	);
-};
+}
 
 export default MessageList;

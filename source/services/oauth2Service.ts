@@ -1,7 +1,9 @@
+import process from 'node:process';
 import {OAuth2Client} from 'google-auth-library';
 import {ConfidentialClientApplication} from '@azure/msal-node';
-import {OAuth2Config} from '../types/email.js';
+import type {OAuth2Config} from '../types/email.js';
 
+// eslint-disable-next-line @typescript-eslint/naming-convention
 export class OAuth2Service {
 	private googleClient?: OAuth2Client;
 	private msalClient?: ConfidentialClientApplication;
@@ -17,6 +19,7 @@ export class OAuth2Service {
 		);
 
 		const authUrl = this.googleClient.generateAuthUrl({
+			// eslint-disable-next-line @typescript-eslint/naming-convention
 			access_type: 'offline',
 			scope: [
 				'https://www.googleapis.com/auth/gmail.readonly',
@@ -32,13 +35,13 @@ export class OAuth2Service {
 
 	async getMicrosoftAuthUrl(
 		clientId: string,
-		tenantId: string = 'common',
+		tenantId = 'common',
 	): Promise<string> {
 		const config = {
 			auth: {
 				clientId,
 				authority: `https://login.microsoftonline.com/${tenantId}`,
-				clientSecret: process.env['OUTLOOK_CLIENT_SECRET'] || '',
+				clientSecret: process.env['OUTLOOK_CLIENT_SECRET'] ?? '',
 			},
 		};
 
@@ -76,8 +79,8 @@ export class OAuth2Service {
 			provider: 'google',
 			clientId,
 			clientSecret,
-			accessToken: tokens.access_token || '',
-			refreshToken: tokens.refresh_token || '',
+			accessToken: tokens.access_token ?? '',
+			refreshToken: tokens.refresh_token ?? '',
 			tokenExpiry: tokens.expiry_date
 				? new Date(tokens.expiry_date)
 				: undefined,
@@ -118,7 +121,7 @@ export class OAuth2Service {
 			clientSecret,
 			accessToken: response.accessToken,
 			refreshToken: '',
-			tokenExpiry: response.expiresOn || undefined,
+			tokenExpiry: response.expiresOn ?? undefined,
 		};
 	}
 
@@ -129,11 +132,12 @@ export class OAuth2Service {
 		);
 
 		client.setCredentials({
+			// eslint-disable-next-line @typescript-eslint/naming-convention
 			refresh_token: oauth2Config.refreshToken,
 		});
 
 		const {credentials} = await client.refreshAccessToken();
-		return credentials.access_token || '';
+		return credentials.access_token ?? '';
 	}
 
 	async refreshMicrosoftToken(oauth2Config: OAuth2Config): Promise<string> {
@@ -141,14 +145,14 @@ export class OAuth2Service {
 			auth: {
 				clientId: oauth2Config.clientId,
 				authority: 'https://login.microsoftonline.com/common',
-				clientSecret: oauth2Config.clientSecret || '',
+				clientSecret: oauth2Config.clientSecret ?? '',
 			},
 		};
 
 		const client = new ConfidentialClientApplication(config);
 
 		const refreshTokenRequest = {
-			refreshToken: oauth2Config.refreshToken || '',
+			refreshToken: oauth2Config.refreshToken ?? '',
 			scopes: [
 				'https://outlook.office.com/IMAP.AccessAsUser.All',
 				'https://outlook.office.com/SMTP.Send',
@@ -158,6 +162,6 @@ export class OAuth2Service {
 		const response = await client.acquireTokenByRefreshToken(
 			refreshTokenRequest,
 		);
-		return response?.accessToken || '';
+		return response?.accessToken ?? '';
 	}
 }

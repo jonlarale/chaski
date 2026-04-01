@@ -2,14 +2,14 @@ export type AssistantRole = 'user' | 'assistant';
 
 export type AssistantStatus = 'idle' | 'thinking' | 'error';
 
-export interface AssistantMessage {
+export type AssistantMessage = {
 	id: string;
 	role: AssistantRole;
 	content: string;
 	createdAt: Date;
-}
+};
 
-export interface AssistantContextSnapshot {
+export type AssistantContextSnapshot = {
 	account?: string;
 	folder?: string;
 	messages: Array<{
@@ -19,18 +19,18 @@ export interface AssistantContextSnapshot {
 		preview?: string;
 		date?: string;
 	}>;
-}
+};
 
-export interface AssistantResponse {
+export type AssistantResponse = {
 	reply: string;
 	usedMessages: AssistantContextSnapshot['messages'];
-}
+};
 
-export interface AssistantOptions {
+export type AssistantOptions = {
 	model?: string;
 	maxContextMessages?: number;
-}
+};
 
-export interface AssistantError {
+export type AssistantError = {
 	message: string;
-}
+};

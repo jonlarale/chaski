@@ -1,20 +1,21 @@
-import {EmailAccount, EmailMessage, EmailFolder} from '../types/email.js';
+import type {EmailAccount, EmailMessage, EmailFolder} from '../types/email.js';
 import {AccountStorageService} from './accountStorageService.js';
 import {ImapService} from './imapService.js';
-import {SmtpService, SendMailOptions} from './smtpService.js';
+import type {SendMailOptions} from './smtpService.js';
+import {SmtpService} from './smtpService.js';
 import {OAuth2Service} from './oauth2Service.js';
 
 export class EmailService {
-	private accountStorage = new AccountStorageService();
-	private oauth2Service = new OAuth2Service();
-	private imapServices = new Map<string, ImapService>();
-	private smtpServices = new Map<string, SmtpService>();
+	private readonly accountStorage = new AccountStorageService();
+	private readonly oauth2Service = new OAuth2Service();
+	private readonly imapServices = new Map<string, ImapService>();
+	private readonly smtpServices = new Map<string, SmtpService>();
 
 	async getAccounts(): Promise<EmailAccount[]> {
 		return this.accountStorage.getAllAccounts();
 	}
 
-	async getAccount(accountId: string): Promise<EmailAccount | null> {
+	async getAccount(accountId: string): Promise<EmailAccount | undefined> {
 		return this.accountStorage.getAccount(accountId);
 	}
 
@@ -39,6 +40,10 @@ export class EmailService {
 		return this.accountStorage.deleteAccount(accountId);
 	}
 
+	async removeAccount(accountId: string): Promise<void> {
+		return this.deleteAccount(accountId);
+	}
+
 	async getGoogleAuthUrl(
 		clientId: string,
 		clientSecret: string,
@@ -50,7 +55,7 @@ export class EmailService {
 		return this.oauth2Service.getMicrosoftAuthUrl(clientId);
 	}
 
-	async handleGoogleOAuth2Callback(
+	async handleGoogleOauth2Callback(
 		code: string,
 		clientId: string,
 		clientSecret: string,
@@ -84,7 +89,7 @@ export class EmailService {
 		return account;
 	}
 
-	async handleMicrosoftOAuth2Callback(
+	async handleMicrosoftOauth2Callback(
 		code: string,
 		clientId: string,
 		clientSecret: string,
@@ -133,8 +138,8 @@ export class EmailService {
 		const messages = await imap.getMessages(folder, limit, sequenceRange);
 
 		// Set accountId and folder on messages
-		return messages.map(msg => ({
-			...msg,
+		return messages.map(message => ({
+			...message,
 			accountId,
 			folder,
 		}));
@@ -144,7 +149,7 @@ export class EmailService {
 		accountId: string,
 		folder: string,
 		uid: number,
-	): Promise<EmailMessage | null> {
+	): Promise<EmailMessage | undefined> {
 		const imap = await this.getImapService(accountId);
 		const message = await imap.getMessage(folder, uid);
 
@@ -221,6 +226,23 @@ export class EmailService {
 		return smtp.sendMail(options);
 	}
 
+	async disconnectAll(): Promise<void> {
+		const disconnectPromises: Array<Promise<void>> = [];
+
+		for (const imap of this.imapServices.values()) {
+			disconnectPromises.push(imap.disconnect());
+		}
+
+		for (const smtp of this.smtpServices.values()) {
+			disconnectPromises.push(smtp.disconnect());
+		}
+
+		await Promise.all(disconnectPromises);
+
+		this.imapServices.clear();
+		this.smtpServices.clear();
+	}
+
 	private async getImapService(accountId: string): Promise<ImapService> {
 		let imap = this.imapServices.get(accountId);
 
@@ -253,22 +275,5 @@ export class EmailService {
 		}
 
 		return smtp;
-	}
-
-	async disconnectAll(): Promise<void> {
-		const disconnectPromises: Promise<void>[] = [];
-
-		for (const imap of this.imapServices.values()) {
-			disconnectPromises.push(imap.disconnect());
-		}
-
-		for (const smtp of this.smtpServices.values()) {
-			disconnectPromises.push(smtp.disconnect());
-		}
-
-		await Promise.all(disconnectPromises);
-
-		this.imapServices.clear();
-		this.smtpServices.clear();
 	}
 }

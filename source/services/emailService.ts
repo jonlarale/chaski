@@ -226,6 +226,24 @@ export class EmailService {
 		return smtp.sendMail(options);
 	}
 
+	async testImapConnection(account: EmailAccount): Promise<void> {
+		const imap = new ImapService();
+		try {
+			await imap.connect(account);
+		} finally {
+			await imap.disconnect();
+		}
+	}
+
+	async testSmtpConnection(account: EmailAccount): Promise<void> {
+		const smtp = new SmtpService();
+		try {
+			await smtp.connect(account);
+		} finally {
+			await smtp.disconnect();
+		}
+	}
+
 	async disconnectAll(): Promise<void> {
 		const disconnectPromises: Array<Promise<void>> = [];
 

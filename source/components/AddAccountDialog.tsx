@@ -1,11 +1,16 @@
+import process from 'node:process';
 import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
 import TextInput from 'ink-text-input';
 import SelectInput from 'ink-select-input';
+import open from 'open';
 import type {EmailAccount} from '../types/email.js';
+import type {EmailService} from '../services/emailService.js';
+import {waitForOauthCallback} from '../services/oauthCallbackServer.js';
 
 type AddAccountDialogProps = {
 	readonly onComplete: (account: EmailAccount | undefined) => void;
+	readonly emailService: EmailService;
 };
 
 type Step =
@@ -15,9 +20,10 @@ type Step =
 	| 'password'
 	| 'imap'
 	| 'smtp'
-	| 'oauth';
+	| 'oauth-waiting'
+	| 'oauth-error';
 
-function AddAccountDialog({onComplete}: AddAccountDialogProps) {
+function AddAccountDialog({onComplete, emailService}: AddAccountDialogProps) {
 	const [step, setStep] = useState<Step>('provider');
 	const [account, setAccount] = useState<Partial<EmailAccount>>({
 		id: `account-${Date.now()}`,
@@ -28,80 +34,161 @@ function AddAccountDialog({onComplete}: AddAccountDialogProps) {
 	const [passwordValue, setPasswordValue] = useState('');
 	const [imapValue, setImapValue] = useState('');
 	const [smtpValue, setSmtpValue] = useState('');
+	const [oauthStatus, setOauthStatus] = useState('');
+	const [oauthError, setOauthError] = useState('');
 
 	useInput((_input, key) => {
 		if (key.escape) {
 			onComplete(undefined);
 		}
+
+		if (step === 'oauth-error' && key.return) {
+			onComplete(undefined);
+		}
 	});
 
 	const providerItems = [
-		{label: 'Gmail', value: 'gmail'},
+		{label: 'Gmail / Google Workspace', value: 'gmail'},
 		{label: 'Outlook/Office 365', value: 'outlook'},
 		{label: 'Other (IMAP/SMTP)', value: 'imap'},
 	];
 
 	const authTypeItems = [
 		{label: 'OAuth2 (Recommended)', value: 'oauth2'},
-		{label: 'Password', value: 'password'},
+		{label: 'App Password', value: 'password'},
 	];
 
 	const handleProviderSelect = (item: {value: string}) => {
-		setAccount({
-			...account,
-			provider: item.value as 'gmail' | 'outlook' | 'imap',
-		});
+		const provider = item.value as 'gmail' | 'outlook' | 'imap';
+		setAccount({...account, provider});
 
-		if (item.value === 'imap') {
+		if (provider === 'imap') {
+			setAccount(previous => ({...previous, provider, authType: 'password'}));
 			setStep('email');
 		} else {
+			setAccount(previous => ({...previous, provider}));
 			setStep('authType');
 		}
 	};
 
 	const handleAuthTypeSelect = (item: {value: string}) => {
-		setAccount({...account, authType: item.value as 'oauth2' | 'password'});
+		const authType = item.value as 'oauth2' | 'password';
+		setAccount(previous => ({...previous, authType}));
 
-		if (item.value === 'oauth2') {
-			setStep('oauth');
+		if (authType === 'oauth2') {
+			setStep('email');
 		} else {
 			setStep('email');
 		}
 	};
 
+	const startOauthFlow = async (
+		email: string,
+		provider: 'gmail' | 'outlook',
+	) => {
+		setStep('oauth-waiting');
+
+		try {
+			let authUrl: string;
+			let clientId: string;
+			let clientSecret: string;
+
+			if (provider === 'gmail') {
+				clientId = process.env['GMAIL_CLIENT_ID'] ?? '';
+				clientSecret = process.env['GMAIL_CLIENT_SECRET'] ?? '';
+
+				if (!clientId || !clientSecret) {
+					setOauthError(
+						'GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET must be set in .env file',
+					);
+					setStep('oauth-error');
+					return;
+				}
+
+				setOauthStatus('Generating authorization URL...');
+				authUrl = await emailService.getGoogleAuthUrl(clientId, clientSecret);
+			} else {
+				clientId = process.env['OUTLOOK_CLIENT_ID'] ?? '';
+				clientSecret = process.env['OUTLOOK_CLIENT_SECRET'] ?? '';
+
+				if (!clientId) {
+					setOauthError('OUTLOOK_CLIENT_ID must be set in .env file');
+					setStep('oauth-error');
+					return;
+				}
+
+				setOauthStatus('Generating authorization URL...');
+				authUrl = await emailService.getMicrosoftAuthUrl(clientId);
+			}
+
+			setOauthStatus('Opening browser for authorization...');
+			await open(authUrl);
+
+			setOauthStatus('Waiting for authorization in browser...');
+			const code = await waitForOauthCallback();
+
+			setOauthStatus('Exchanging authorization code for tokens...');
+
+			let oauthAccount: EmailAccount;
+			if (provider === 'gmail') {
+				oauthAccount = await emailService.handleGoogleOauth2Callback(
+					code,
+					clientId,
+					clientSecret,
+				);
+			} else {
+				oauthAccount = await emailService.handleMicrosoftOauth2Callback(
+					code,
+					clientId,
+					clientSecret,
+				);
+			}
+
+			// Fill in user details
+			oauthAccount.id = account.id ?? `account-${Date.now()}`;
+			oauthAccount.email = email;
+			oauthAccount.displayName = email;
+
+			setOauthStatus('Authorization successful!');
+			onComplete(oauthAccount);
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message : String(error);
+			setOauthError(message);
+			setStep('oauth-error');
+		}
+	};
+
 	const handleEmailSubmit = (email: string) => {
-		// Sanitize input
 		const sanitizedEmail = email.trim();
 
-		// Ensure email is in proper format
-		if (!sanitizedEmail.includes('@') && account.provider === 'imap') {
-			console.log('Please enter a full email address (e.g., user@domain.com)');
+		if (!sanitizedEmail.includes('@')) {
 			return;
 		}
 
-		setAccount({
-			...account,
+		setAccount(previous => ({
+			...previous,
 			email: sanitizedEmail,
 			displayName: sanitizedEmail,
-		});
+		}));
 
-		if (account.authType === 'password') {
+		if (
+			account.authType === 'oauth2' &&
+			(account.provider === 'gmail' || account.provider === 'outlook')
+		) {
+			void startOauthFlow(sanitizedEmail, account.provider);
+		} else if (account.authType === 'password') {
 			setStep('password');
 		} else if (account.provider === 'imap') {
 			setStep('imap');
-		} else {
-			// For OAuth2, we're done
-			onComplete(account as EmailAccount);
 		}
 	};
 
 	const handlePasswordSubmit = (password: string) => {
-		// Sanitize input
 		const sanitizedPassword = password.trim();
 
 		if (account.provider === 'gmail') {
-			setAccount({
-				...account,
+			const completeAccount: EmailAccount = {
+				...(account as EmailAccount),
 				imapConfig: {
 					host: 'imap.gmail.com',
 					port: 993,
@@ -116,11 +203,12 @@ function AddAccountDialog({onComplete}: AddAccountDialogProps) {
 					username: account.email,
 					password: sanitizedPassword,
 				},
-			});
-			onComplete(account as EmailAccount);
+			};
+			setAccount(completeAccount);
+			onComplete(completeAccount);
 		} else if (account.provider === 'outlook') {
-			setAccount({
-				...account,
+			const completeAccount: EmailAccount = {
+				...(account as EmailAccount),
 				imapConfig: {
 					host: 'outlook.office365.com',
 					port: 993,
@@ -135,15 +223,15 @@ function AddAccountDialog({onComplete}: AddAccountDialogProps) {
 					username: account.email,
 					password: sanitizedPassword,
 				},
-			});
-			onComplete(account as EmailAccount);
+			};
+			setAccount(completeAccount);
+			onComplete(completeAccount);
 		} else {
 			setStep('imap');
 		}
 	};
 
 	const handleImapSubmit = (value: string) => {
-		// Sanitize input
 		const sanitizedValue = value.trim();
 
 		if (!account.imapConfig) {
@@ -169,12 +257,11 @@ function AddAccountDialog({onComplete}: AddAccountDialogProps) {
 	};
 
 	const handleSmtpSubmit = (value: string) => {
-		// Sanitize input
 		const sanitizedValue = value.trim();
 
 		if (!account.smtpConfig) {
-			setAccount({
-				...account,
+			const completeAccount: EmailAccount = {
+				...(account as EmailAccount),
 				smtpConfig: {
 					host: sanitizedValue,
 					port: 587,
@@ -182,8 +269,9 @@ function AddAccountDialog({onComplete}: AddAccountDialogProps) {
 					username: account.email,
 					password: account.imapConfig?.password,
 				},
-			});
-			onComplete(account as EmailAccount);
+			};
+			setAccount(completeAccount);
+			onComplete(completeAccount);
 		}
 	};
 
@@ -235,12 +323,16 @@ function AddAccountDialog({onComplete}: AddAccountDialogProps) {
 				{step === 'password' && (
 					<Box flexDirection="column">
 						<Text>Enter your password:</Text>
-						<Text dimColor italic>
-							For Gmail: Use an App Password
-						</Text>
-						<Text dimColor italic>
-							For Outlook: Use your account password
-						</Text>
+						{account.provider === 'gmail' && (
+							<Text dimColor italic>
+								Use an App Password (generate at myaccount.google.com)
+							</Text>
+						)}
+						{account.provider === 'outlook' && (
+							<Text dimColor italic>
+								Use your account password
+							</Text>
+						)}
 						<Box marginTop={1}>
 							<TextInput
 								value={passwordValue}
@@ -298,22 +390,30 @@ function AddAccountDialog({onComplete}: AddAccountDialogProps) {
 					</Box>
 				)}
 
-				{step === 'oauth' && (
+				{step === 'oauth-waiting' && (
 					<Box flexDirection="column">
-						<Text bold color="yellow">
-							OAuth2 Setup Required
+						<Text bold color="cyan">
+							Google Authorization
 						</Text>
-						<Box flexDirection="column" marginTop={1}>
-							<Text>To use OAuth2 authentication, you need to:</Text>
-							<Text>1. Set up OAuth2 credentials for your app</Text>
-							<Text>2. Configure redirect URLs</Text>
-							<Text>3. Handle the OAuth2 flow</Text>
-							<Box marginTop={1}>
-								<Text dimColor>
-									This requires additional setup. Press Enter to continue with
-									password auth instead.
-								</Text>
-							</Box>
+						<Box marginTop={1}>
+							<Text>{oauthStatus || 'Starting...'}</Text>
+						</Box>
+						<Box marginTop={1}>
+							<Text dimColor>Complete the authorization in your browser.</Text>
+						</Box>
+					</Box>
+				)}
+
+				{step === 'oauth-error' && (
+					<Box flexDirection="column">
+						<Text bold color="red">
+							Authorization Failed
+						</Text>
+						<Box marginTop={1}>
+							<Text color="red">{oauthError}</Text>
+						</Box>
+						<Box marginTop={1}>
+							<Text dimColor>Press Enter or ESC to go back.</Text>
 						</Box>
 					</Box>
 				)}

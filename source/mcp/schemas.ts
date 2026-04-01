@@ -74,6 +74,36 @@ export const downloadAttachmentSchema = {
 		.describe('Zero-based index of the attachment'),
 };
 
+export const addAccountSchema = {
+	email: z.string().describe('Email address'),
+	provider: z
+		.enum(['gmail', 'outlook', 'imap'])
+		.describe('Email provider (gmail for Google Workspace too)'),
+	password: z.string().describe('Email password or app password'),
+	imapHost: z
+		.string()
+		.optional()
+		.describe(
+			'IMAP server host (auto-detected for gmail/outlook, required for imap)',
+		),
+	imapPort: z.number().optional().default(993).describe('IMAP port'),
+	smtpHost: z
+		.string()
+		.optional()
+		.describe(
+			'SMTP server host (auto-detected for gmail/outlook, required for imap)',
+		),
+	smtpPort: z.number().optional().default(587).describe('SMTP port'),
+	displayName: z
+		.string()
+		.optional()
+		.describe('Display name (defaults to email)'),
+};
+
+export const removeAccountSchema = {
+	accountId: z.string().describe('The account ID to remove'),
+};
+
 export const refreshFolderSchema = {
 	accountId: z.string().describe('The account ID'),
 	folder: z

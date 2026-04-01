@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**chaski** is a fully-functional terminal-based email client built with Ink (React for CLIs) and TypeScript. It supports Gmail, Outlook, and custom IMAP/SMTP accounts with OAuth2 authentication, SQLite caching, and an optional OpenAI-powered inbox assistant.
+**chaski** is an open-source terminal-based email client built with Ink (React for CLIs) and TypeScript. It supports Gmail, Outlook, and custom IMAP/SMTP accounts with OAuth2 authentication, SQLite caching, and an optional OpenAI-powered inbox assistant.
+
+**Open source principles:** This project is designed for anyone to clone and run on their own machine. Nothing should be hardcoded -- all provider credentials, callback URLs, ports, and API keys must be configurable via environment variables (`.env`). When adding features, always use `process.env['VAR_NAME']` with sensible defaults.
 
 ## Essential Commands
 
@@ -316,6 +318,7 @@ EmailViewer implements custom smooth scrolling:
 2. **Not awaiting async service calls**: Can lead to stale UI state
 3. **Modifying cache without updating cache metadata**: Folder counts become inaccurate
 4. **Hardcoding file paths**: Always use `homedir()` and `join()` for cross-platform support
+4b. **Hardcoding credentials/URLs/ports**: Always use `process.env` with defaults -- this is an open-source project
 5. **Ignoring `commandInputActive`**: Causes command input conflicts
 6. **Not updating `refreshTrigger`**: MessageList won't re-render after cache update
 
@@ -334,18 +337,25 @@ All data stored in `~/.chaski/`:
 
 ## Environment Variables
 
-Optional (loaded from `.env`):
+All configurable via `.env` (loaded by `start.tsx` via dotenv). See `.env.example` for the full reference.
 
 ```bash
-# OAuth2 defaults (can be overridden per account)
+# OAuth2 provider credentials
 GMAIL_CLIENT_ID=...
 GMAIL_CLIENT_SECRET=...
 OUTLOOK_CLIENT_ID=...
 OUTLOOK_CLIENT_SECRET=...
 
-# AI Assistant (required for assistant features)
+# OAuth2 callback server (configurable port/path)
+OAUTH_CALLBACK_PORT=3000          # Default: 3000
+OAUTH_CALLBACK_PATH=/oauth2/callback  # Default: /oauth2/callback
+OAUTH_REDIRECT_URI=               # Full override (optional, built from port+path if unset)
+
+# AI Assistant
 OPENAI_API_KEY=sk-...
 ```
+
+**Important:** Never hardcode credentials, URLs, or ports. Always read from `process.env` with sensible defaults. The redirect URI used by OAuth2Service is built dynamically from `OAUTH_CALLBACK_PORT` and `OAUTH_CALLBACK_PATH` (or overridden entirely by `OAUTH_REDIRECT_URI`).
 
 ## Debugging
 

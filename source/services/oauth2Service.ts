@@ -3,6 +3,12 @@ import {OAuth2Client} from 'google-auth-library';
 import {ConfidentialClientApplication} from '@azure/msal-node';
 import type {OAuth2Config} from '../types/email.js';
 
+function getRedirectUri(): string {
+	const port = process.env['OAUTH_CALLBACK_PORT'] ?? '3000';
+	const path = process.env['OAUTH_CALLBACK_PATH'] ?? '/oauth2/callback';
+	return process.env['OAUTH_REDIRECT_URI'] ?? `http://localhost:${port}${path}`;
+}
+
 // eslint-disable-next-line @typescript-eslint/naming-convention
 export class OAuth2Service {
 	private googleClient?: OAuth2Client;
@@ -15,7 +21,7 @@ export class OAuth2Service {
 		this.googleClient = new OAuth2Client(
 			clientId,
 			clientSecret,
-			'http://localhost:3000/oauth2/callback',
+			getRedirectUri(),
 		);
 
 		const authUrl = this.googleClient.generateAuthUrl({
@@ -53,7 +59,7 @@ export class OAuth2Service {
 				'https://outlook.office.com/SMTP.Send',
 				'offline_access',
 			],
-			redirectUri: 'http://localhost:3000/oauth2/callback',
+			redirectUri: getRedirectUri(),
 		};
 
 		const authUrl = await this.msalClient.getAuthCodeUrl(authCodeUrlParameters);
@@ -69,7 +75,7 @@ export class OAuth2Service {
 			this.googleClient = new OAuth2Client(
 				clientId,
 				clientSecret,
-				'http://localhost:3000/oauth2/callback',
+				getRedirectUri(),
 			);
 		}
 
@@ -110,7 +116,7 @@ export class OAuth2Service {
 				'https://outlook.office.com/SMTP.Send',
 				'offline_access',
 			],
-			redirectUri: 'http://localhost:3000/oauth2/callback',
+			redirectUri: getRedirectUri(),
 		};
 
 		const response = await this.msalClient.acquireTokenByCode(tokenRequest);

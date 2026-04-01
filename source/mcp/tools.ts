@@ -4,7 +4,7 @@ import {type CacheService} from '../services/cacheService.js';
 import {type AssistantService} from '../services/assistantService.js';
 import {type SettingsService} from '../services/settingsService.js';
 import {type DownloadService} from '../services/downloadService.js';
-import {type EmailMessage} from '../types/email.js';
+import {type EmailAccount, type EmailMessage} from '../types/email.js';
 import {sanitizeAccount} from './sanitize.js';
 import {
 	accountIdSchema,
@@ -16,6 +16,8 @@ import {
 	assistantQuerySchema,
 	downloadAttachmentSchema,
 	refreshFolderSchema,
+	addAccountSchema,
+	removeAccountSchema,
 } from './schemas.js';
 
 export type ServiceContainer = {
@@ -53,6 +55,108 @@ export function registerTools(server: McpServer, services: ServiceContainer) {
 			try {
 				const accounts = await emailService.getAccounts();
 				return jsonResult(accounts.map(a => sanitizeAccount(a)));
+			} catch (error: unknown) {
+				return errorResult((error as Error).message);
+			}
+		},
+	);
+
+	server.tool(
+		'add-account',
+		'Add a new email account. Tests IMAP/SMTP connection before saving. Use provider "gmail" for Google Workspace accounts.',
+		addAccountSchema,
+		async ({
+			email,
+			provider,
+			password,
+			imapHost,
+			imapPort,
+			smtpHost,
+			smtpPort,
+			displayName,
+		}) => {
+			try {
+				const providerDefaults: Record<
+					string,
+					{imapHost: string; smtpHost: string}
+				> = {
+					gmail: {imapHost: 'imap.gmail.com', smtpHost: 'smtp.gmail.com'},
+					outlook: {
+						imapHost: 'outlook.office365.com',
+						smtpHost: 'smtp.office365.com',
+					},
+				};
+
+				const defaults = providerDefaults[provider];
+				const resolvedImapHost = imapHost ?? defaults?.imapHost;
+				const resolvedSmtpHost = smtpHost ?? defaults?.smtpHost;
+
+				if (!resolvedImapHost || !resolvedSmtpHost) {
+					return errorResult(
+						'IMAP and SMTP hosts are required for custom IMAP provider',
+					);
+				}
+
+				const account: EmailAccount = {
+					id: `account-${Date.now()}`,
+					email,
+					displayName: displayName ?? email,
+					provider,
+					authType: 'password',
+					imapConfig: {
+						host: resolvedImapHost,
+						port: imapPort ?? 993,
+						secure: true,
+						username: email,
+						password,
+					},
+					smtpConfig: {
+						host: resolvedSmtpHost,
+						port: smtpPort ?? 587,
+						secure: false,
+						username: email,
+						password,
+					},
+				};
+
+				// Test connections before saving
+				await emailService.testImapConnection(account);
+				await emailService.testSmtpConnection(account);
+
+				// Connections successful, save account
+				await emailService.saveAccount(account);
+
+				return jsonResult({
+					success: true,
+					accountId: account.id,
+					email: account.email,
+					provider: account.provider,
+					message: 'Account added and verified successfully',
+				});
+			} catch (error: unknown) {
+				return errorResult((error as Error).message);
+			}
+		},
+	);
+
+	server.tool(
+		'remove-account',
+		'Remove an email account and its stored credentials',
+		removeAccountSchema,
+		async ({accountId}) => {
+			try {
+				const account = await emailService.getAccount(accountId);
+				if (!account) {
+					return errorResult(`Account ${accountId} not found`);
+				}
+
+				await emailService.deleteAccount(accountId);
+				return jsonResult({
+					success: true,
+					accountId,
+					email: account.email,
+					message: 'Account removed successfully',
+				});
 			} catch (error: unknown) {
 				return errorResult((error as Error).message);
 			}

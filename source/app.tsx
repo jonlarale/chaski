@@ -1210,7 +1210,12 @@ function App() {
 		}
 
 		case 'addAccount': {
-			return <AddAccountDialog onComplete={handleAddAccountComplete} />;
+			return (
+				<AddAccountDialog
+					emailService={emailService}
+					onComplete={handleAddAccountComplete}
+				/>
+			);
 		}
 
 		case 'editAccount': {

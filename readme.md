@@ -153,22 +153,24 @@ After configuration, restart Claude Code and it will have access to all Chaski t
 
 ### Available MCP Tools
 
-| Tool                  | Description                                                      |
-| --------------------- | ---------------------------------------------------------------- |
-| `list-accounts`       | List configured email accounts (credentials are never exposed)   |
-| `list-folders`        | List all folders/mailboxes for an account                        |
-| `get-folder-status`   | Get total and unread message counts for a folder                 |
-| `list-messages`       | List messages from the local cache (fast, use after refresh)     |
-| `read-message`        | Read a single email with its full body                           |
-| `get-thread`          | Retrieve all messages in a conversation thread                   |
-| `search-messages`     | Search cached messages by subject, sender, or preview content    |
-| `send-email`          | Send an email (compose, reply, or forward)                       |
-| `mark-as-read`        | Mark a message as read                                           |
-| `delete-message`      | Delete a message                                                 |
-| `refresh-folder`      | Sync messages from the IMAP server into the local cache          |
-| `get-cache-status`    | Get statistics about the local SQLite cache                      |
-| `ask-assistant`       | Ask the AI assistant a question about your emails (needs OpenAI) |
-| `download-attachment` | Download an email attachment to disk                             |
+| Tool                  | Description                                                          |
+| --------------------- | -------------------------------------------------------------------- |
+| `list-accounts`       | List configured email accounts (credentials are never exposed)       |
+| `add-account`         | Add a new email account (tests IMAP/SMTP connection before saving)   |
+| `remove-account`      | Remove an email account and its stored credentials                   |
+| `list-folders`        | List all folders/mailboxes for an account                            |
+| `get-folder-status`   | Get total and unread message counts for a folder                     |
+| `list-messages`       | List messages from the local cache (fast, use after refresh)         |
+| `read-message`        | Read a single email with its full body                               |
+| `get-thread`          | Retrieve all messages in a conversation thread                       |
+| `search-messages`     | Search cached messages by subject, sender, or preview content        |
+| `send-email`          | Send an email (compose, reply, or forward)                           |
+| `mark-as-read`        | Mark a message as read                                               |
+| `delete-message`      | Delete a message                                                     |
+| `refresh-folder`      | Sync messages from the IMAP server into the local cache              |
+| `get-cache-status`    | Get statistics about the local SQLite cache                          |
+| `ask-assistant`       | Ask the AI assistant a question about your emails (needs OpenAI)     |
+| `download-attachment` | Download an email attachment to disk                                 |
 
 ### Available MCP Resources
 
@@ -200,37 +202,130 @@ npx @modelcontextprotocol/inspector npx tsx source/mcp/index.ts
 
 ### Email Account Setup
 
-The app supports three types of email accounts:
+Chaski supports three types of email accounts. For Gmail and Outlook the recommended method is **OAuth2** -- users sign in through their browser and never share their password with Chaski.
 
-#### Gmail (OAuth2)
+---
 
-```
-Provider: Gmail
-Authentication: OAuth2
-Client ID: Your Google OAuth2 Client ID
-Client Secret: Your Google OAuth2 Client Secret
+### Gmail / Google Workspace OAuth2 Setup
+
+> This is the **recommended** way to connect any `@gmail.com` or Google Workspace account.
+
+#### 1. Create a Google Cloud project
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Click the project selector at the top and choose **New Project**
+3. Give it a name (e.g. "Chaski Email") and click **Create**
+
+#### 2. Enable the Gmail API
+
+1. In your project, go to **APIs & Services > Library**
+2. Search for **Gmail API** and click **Enable**
+
+#### 3. Configure the OAuth consent screen
+
+1. Go to **APIs & Services > OAuth consent screen**
+2. Select **External** (or **Internal** if you have Google Workspace and only need it for your organization)
+3. Fill in the required fields: App name, User support email, Developer contact email
+4. On the **Scopes** step, add these scopes:
+   - `https://mail.google.com/`
+   - `https://www.googleapis.com/auth/gmail.readonly`
+   - `https://www.googleapis.com/auth/gmail.send`
+   - `https://www.googleapis.com/auth/gmail.modify`
+5. On the **Test users** step, add the Gmail/Workspace email addresses that will use Chaski
+6. Click **Save and Continue**
+
+#### 4. Create OAuth2 credentials
+
+1. Go to **APIs & Services > Credentials**
+2. Click **Create Credentials > OAuth client ID**
+3. Application type: **Web application** (or Desktop app)
+4. If you chose Web application, add an **Authorized redirect URI**:
+   ```
+   http://localhost:3000/oauth2/callback
+   ```
+   > Change the port/path if you customized `OAUTH_CALLBACK_PORT` or `OAUTH_CALLBACK_PATH`.
+5. Click **Create**
+6. Copy the **Client ID** and **Client Secret**
+
+#### 5. Add credentials to `.env`
+
+```bash
+cp .env.example .env
 ```
 
-#### Outlook (OAuth2)
+Edit `.env` and fill in:
 
-```
-Provider: Outlook
-Authentication: OAuth2
-Client ID: Your Microsoft OAuth2 Client ID
-Client Secret: Your Microsoft OAuth2 Client Secret
+```bash
+GMAIL_CLIENT_ID=123456789-abc.apps.googleusercontent.com
+GMAIL_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxx
 ```
 
-#### Custom IMAP/SMTP
+#### 6. Add your account in Chaski
 
+1. Run `chaski` (or `npm start`)
+2. Press Tab, type `/add-account`, press Enter
+3. Select **Gmail / Google Workspace**
+4. Select **OAuth2 (Recommended)**
+5. Enter your email address
+6. Your browser will open automatically -- sign in and authorize Chaski
+7. The browser shows "Authorization Successful" and you can close it
+8. Chaski saves the account and you're ready to go
+
+---
+
+### Outlook / Office 365 OAuth2 Setup
+
+#### 1. Register an app in Azure AD
+
+1. Go to [Azure Portal - App registrations](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)
+2. Click **New registration**
+3. Name: "Chaski Email"
+4. Supported account types: choose as appropriate for your organization
+5. Redirect URI: **Web** > `http://localhost:3000/oauth2/callback`
+   > Change the port/path if you customized `OAUTH_CALLBACK_PORT` or `OAUTH_CALLBACK_PATH`.
+6. Click **Register**
+
+#### 2. Create a client secret
+
+1. Go to **Certificates & secrets > New client secret**
+2. Copy the **Value** (this is your client secret)
+
+#### 3. Note the Application (client) ID
+
+Found on the app's **Overview** page.
+
+#### 4. Configure API permissions
+
+1. Go to **API permissions > Add a permission > Microsoft Graph**
+2. Add: `IMAP.AccessAsUser.All`, `SMTP.Send`, `offline_access`
+3. Click **Grant admin consent** if you are an admin
+
+#### 5. Add credentials to `.env`
+
+```bash
+OUTLOOK_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+OUTLOOK_CLIENT_SECRET=your_secret_value
 ```
-Provider: Custom
-IMAP Host: imap.example.com
-IMAP Port: 993
-SMTP Host: smtp.example.com
-SMTP Port: 587
-Username: your@email.com
-Password: Your password
-```
+
+#### 6. Add your account in Chaski
+
+Same flow as Gmail: `/add-account` > Outlook > OAuth2 > enter email > authorize in browser.
+
+---
+
+### Custom IMAP/SMTP
+
+For any email provider that supports IMAP/SMTP (Fastmail, Zoho, self-hosted, etc.):
+
+1. `/add-account` > **Other (IMAP/SMTP)**
+2. Enter your email address
+3. Enter IMAP server hostname (e.g. `imap.fastmail.com`)
+4. Enter your password
+5. Enter SMTP server hostname (e.g. `smtp.fastmail.com`)
+
+Default ports: IMAP 993 (TLS), SMTP 587 (STARTTLS).
+
+---
 
 ### Application Settings
 
@@ -251,21 +346,24 @@ Settings are stored in `~/.chaski/settings.json`:
 
 ### Environment Variables
 
-While the app doesn't require environment variables for basic operation, you can set these for OAuth2 providers:
+Copy `.env.example` to `.env` and configure as needed:
 
 ```bash
-# Optional: Default OAuth2 credentials
-GMAIL_CLIENT_ID=your_google_client_id
-GMAIL_CLIENT_SECRET=your_google_client_secret
-OUTLOOK_CLIENT_ID=your_microsoft_client_id
-OUTLOOK_CLIENT_SECRET=your_microsoft_client_secret
+cp .env.example .env
 ```
 
-To unlock the AI assistant, add your OpenAI key as well:
-
-```bash
-OPENAI_API_KEY=sk-live-your-key
-```
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `GMAIL_CLIENT_ID` | For Gmail OAuth2 | -- | Google OAuth2 Client ID |
+| `GMAIL_CLIENT_SECRET` | For Gmail OAuth2 | -- | Google OAuth2 Client Secret |
+| `OUTLOOK_CLIENT_ID` | For Outlook OAuth2 | -- | Microsoft OAuth2 Client ID |
+| `OUTLOOK_CLIENT_SECRET` | For Outlook OAuth2 | -- | Microsoft OAuth2 Client Secret |
+| `OAUTH_CALLBACK_PORT` | No | `3000` | Port for the local OAuth2 callback server |
+| `OAUTH_CALLBACK_PATH` | No | `/oauth2/callback` | Path for the OAuth2 callback |
+| `OAUTH_REDIRECT_URI` | No | auto-built | Full redirect URI override (takes precedence) |
+| `OPENAI_API_KEY` | For AI assistant | -- | OpenAI API key |
+| `DEBUG` | No | `false` | Enable debug logging to `./debug.log` |
+| `CACHE_MAX_AGE` | No | `10` | Cache max age in minutes |
 
 ## Security
 
@@ -358,8 +456,9 @@ All application data is stored in `~/.chaski/`:
 
 1. Check your internet connection
 2. Verify IMAP/SMTP settings
-3. For Gmail/Outlook, ensure "Less secure app access" or app passwords are configured
-4. Check firewall settings
+3. For Gmail/Outlook, use OAuth2 (recommended) or App Passwords -- regular passwords do not work
+4. Ensure IMAP is enabled in your email provider settings
+5. Check firewall settings -- the OAuth2 callback server uses port 3000 by default
 
 ### Cache issues
 

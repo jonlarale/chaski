@@ -73,13 +73,16 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
 	};
 
 	const handleEmailSubmit = (email: string) => {
+		// Sanitize input
+		const sanitizedEmail = email.trim();
+
 		// Ensure email is in proper format
-		if (!email.includes('@') && account.provider === 'imap') {
+		if (!sanitizedEmail.includes('@') && account.provider === 'imap') {
 			console.log('Please enter a full email address (e.g., user@domain.com)');
 			return;
 		}
 
-		setAccount({...account, email, displayName: email});
+		setAccount({...account, email: sanitizedEmail, displayName: sanitizedEmail});
 
 		if (account.authType === 'password') {
 			setStep('password');
@@ -92,6 +95,9 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
 	};
 
 	const handlePasswordSubmit = (password: string) => {
+		// Sanitize input
+		const sanitizedPassword = password.trim();
+
 		if (account.provider === 'gmail') {
 			setAccount({
 				...account,
@@ -100,14 +106,14 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
 					port: 993,
 					secure: true,
 					username: account.email,
-					password,
+					password: sanitizedPassword,
 				},
 				smtpConfig: {
 					host: 'smtp.gmail.com',
 					port: 587,
 					secure: false,
 					username: account.email,
-					password,
+					password: sanitizedPassword,
 				},
 			});
 			onComplete(account as EmailAccount);
@@ -119,14 +125,14 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
 					port: 993,
 					secure: true,
 					username: account.email,
-					password,
+					password: sanitizedPassword,
 				},
 				smtpConfig: {
 					host: 'smtp.office365.com',
 					port: 587,
 					secure: false,
 					username: account.email,
-					password,
+					password: sanitizedPassword,
 				},
 			});
 			onComplete(account as EmailAccount);
@@ -136,11 +142,14 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
 	};
 
 	const handleImapSubmit = (value: string) => {
+		// Sanitize input
+		const sanitizedValue = value.trim();
+
 		if (!account.imapConfig) {
 			setAccount({
 				...account,
 				imapConfig: {
-					host: value,
+					host: sanitizedValue,
 					port: 993,
 					secure: true,
 					username: account.email,
@@ -152,18 +161,21 @@ export const AddAccountDialog: React.FC<AddAccountDialogProps> = ({
 		} else if (!account.imapConfig.password) {
 			setAccount({
 				...account,
-				imapConfig: {...account.imapConfig, password: value},
+				imapConfig: {...account.imapConfig, password: sanitizedValue},
 			});
 			setStep('smtp');
 		}
 	};
 
 	const handleSmtpSubmit = (value: string) => {
+		// Sanitize input
+		const sanitizedValue = value.trim();
+
 		if (!account.smtpConfig) {
 			setAccount({
 				...account,
 				smtpConfig: {
-					host: value,
+					host: sanitizedValue,
 					port: 587,
 					secure: false,
 					username: account.email,

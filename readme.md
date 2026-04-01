@@ -42,7 +42,7 @@ npm install -g chaski
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/chaski.git
+git clone https://github.com/jonlarale/chaski.git
 cd chaski
 
 # Install dependencies
@@ -97,35 +97,59 @@ Chaski ships with a built-in [Model Context Protocol](https://modelcontextprotoc
 ### Running the MCP Server
 
 ```bash
-# With tsx (development)
-npm run mcp
-
-# With the compiled build
+# Build first (required)
 npm run build
-npm run mcp:build
 
-# Or directly
-npx tsx source/mcp/index.ts
+# Run the compiled server (recommended)
+npm run mcp:build
+# or directly:
+node dist/mcp/index.js
+
+# Development mode (uses tsx, no build needed)
+npm run mcp
 ```
 
 The server communicates over **stdio** (JSON-RPC), which is the standard transport for local MCP integrations such as Claude Code and other AI-powered tools.
 
 ### Configuring with Claude Code
 
-Add Chaski to your Claude Code MCP settings (`~/.claude/settings.json` or project-level `.claude/settings.json`):
+The easiest way is to create a `.mcp.json` file in the chaski project root:
 
 ```json
 {
 	"mcpServers": {
 		"chaski": {
-			"command": "npx",
-			"args": ["tsx", "/absolute/path/to/chaski/source/mcp/index.ts"]
+			"command": "node",
+			"args": ["dist/mcp/index.js"],
+			"cwd": "/absolute/path/to/chaski"
 		}
 	}
 }
 ```
 
-After configuration, Claude Code will have access to all Chaski tools automatically.
+Alternatively, add it to your global Claude Code settings (`~/.claude/settings.json`):
+
+```json
+{
+	"mcpServers": {
+		"chaski": {
+			"command": "node",
+			"args": ["/absolute/path/to/chaski/dist/mcp/index.js"],
+			"cwd": "/absolute/path/to/chaski"
+		}
+	}
+}
+```
+
+> **Important — NVM users:** If you use NVM to manage Node.js, `node` may not be on the system PATH when Claude Code spawns subprocesses. Use the absolute path to your node binary instead:
+>
+> ```json
+> "command": "/Users/you/.nvm/versions/node/v22.x.x/bin/node"
+> ```
+>
+> Find your path with: `which node` or `echo "$(dirname $(realpath $(which node)))/node"`
+
+After configuration, restart Claude Code and it will have access to all Chaski tools automatically.
 
 ### Available MCP Tools
 
@@ -159,6 +183,10 @@ After configuration, Claude Code will have access to all Chaski tools automatica
 You can interactively test all tools using the official MCP Inspector:
 
 ```bash
+# Using the compiled build (recommended)
+npx @modelcontextprotocol/inspector node dist/mcp/index.js
+
+# Or in development mode
 npx @modelcontextprotocol/inspector npx tsx source/mcp/index.ts
 ```
 
@@ -420,7 +448,7 @@ GitHub: [@jonlarale](https://github.com/jonlarale)
 
 ## Support
 
-For bugs and feature requests, please [open an issue](https://github.com/yourusername/chaski/issues).
+For bugs and feature requests, please [open an issue](https://github.com/jonlarale/chaski/issues).
 
 ---
 

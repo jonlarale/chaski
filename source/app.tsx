@@ -72,7 +72,7 @@ type Message = {
 		contentId?: string;
 		content?: Buffer;
 	}>;
-	_original?: unknown; // Original EmailMessage data
+	_original?: EmailMessage; // Original EmailMessage data
 };
 
 function App() {
@@ -100,13 +100,17 @@ function App() {
 		useState<string>('example@gmail.com');
 	const [commandInputActive, setCommandInputActive] = useState(false);
 	const [emailService, setEmailService] = useState(() => new EmailService());
+	void setEmailService;
 	const [settingsService, setSettingsService] = useState(
 		() => new SettingsService(),
 	);
+	void setSettingsService;
 	const [cacheService, setCacheService] = useState(() => new CacheService());
+	void setCacheService;
 	const [downloadService, setDownloadService] = useState(
 		() => new DownloadService(),
 	);
+	void setDownloadService;
 	const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([]);
 	const [refreshStatus, setRefreshStatus] = useState<RefreshStatus>({
 		isRefreshing: false,
@@ -115,6 +119,7 @@ function App() {
 	const [assistantService, setAssistantService] = useState(
 		() => new AssistantService(),
 	);
+	void setAssistantService;
 	const [assistantMessages, setAssistantMessages] = useState<
 		AssistantMessage[]
 	>([]);
@@ -163,12 +168,8 @@ function App() {
 	});
 
 	const gatherAssistantContext = async () => {
-		const openedEmailOriginal = openedEmail?._original as
-			| EmailMessage
-			| undefined;
-		const openedThreadOriginal = openedThread?._original as
-			| EmailMessage
-			| undefined;
+		const openedEmailOriginal = openedEmail?._original;
+		const openedThreadOriginal = openedThread?._original;
 		const folderCandidate =
 			openedEmailOriginal?.folder ??
 			openedThreadOriginal?.folder ??
@@ -400,7 +401,7 @@ function App() {
 
 		// If the message has the original email data, mark it as read in the email service
 		if (message._original && selectedAccount) {
-			const originalMessage = message._original as EmailMessage;
+			const originalMessage = message._original;
 			const account = emailAccounts.find(acc => acc.email === selectedAccount);
 
 			if (account && originalMessage.uid) {
@@ -1319,7 +1320,6 @@ function App() {
 						]}
 						isCommandInputActive={commandInputActive}
 						view="main"
-						onQuit={onQuit}
 					/>
 				</Box>
 			);

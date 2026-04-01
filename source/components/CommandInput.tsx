@@ -196,7 +196,7 @@ function CommandInput({isActive, onDeactivate, onCommand}: CommandInputProps) {
 						{isActive ? (
 							<Box flexGrow={1}>
 								<TextInput
-									focus
+									isFocus
 									placeholder="Ask about your mail or type / for commands..."
 									value={inputValue}
 									onChange={setInputValue}

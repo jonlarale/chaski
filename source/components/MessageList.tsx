@@ -122,7 +122,6 @@ const formatCount = (count: number): string => {
 const formatCacheAge = (lastSync: Date | undefined): string => {
 	if (!lastSync) return 'Not synced';
 
-	const now = new Date();
 	const diffMs = Date.now() - lastSync.getTime();
 	const diffMins = Math.floor(diffMs / 60_000);
 	const diffHours = Math.floor(diffMs / 3_600_000);
@@ -188,7 +187,7 @@ function MessageList({
 		setViewportOffset(0);
 		setMessageCache({});
 		setTotalMessages(0);
-		lastAutoRefreshRef.current = null;
+		lastAutoRefreshRef.current = undefined;
 	}, [folder, account]);
 
 	// Set up auto-refresh interval
@@ -196,7 +195,7 @@ function MessageList({
 		// Clear any existing interval
 		if (autoRefreshIntervalRef.current) {
 			clearInterval(autoRefreshIntervalRef.current);
-			autoRefreshIntervalRef.current = null;
+			autoRefreshIntervalRef.current = undefined;
 		}
 
 		// Only set up interval if auto-refresh is enabled and we have focus
@@ -235,7 +234,7 @@ function MessageList({
 		return () => {
 			if (autoRefreshIntervalRef.current) {
 				clearInterval(autoRefreshIntervalRef.current);
-				autoRefreshIntervalRef.current = null;
+				autoRefreshIntervalRef.current = undefined;
 			}
 		};
 	}, [

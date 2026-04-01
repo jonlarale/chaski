@@ -586,7 +586,6 @@ function ThreadViewer({
 				]}
 				isCommandInputActive={isCommandInputActive}
 				view="thread"
-				onQuit={onBack}
 			/>
 		</Box>
 	);

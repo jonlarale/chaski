@@ -776,7 +776,7 @@ Original error: ${error.message}`),
 			date: parsed.date ?? new Date(),
 			body: {
 				text: parsed.text ?? undefined,
-				html: parsed.html ?? undefined,
+				html: parsed.html || undefined,
 			},
 			attachments: parsed.attachments?.map((att: any) => ({
 				// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

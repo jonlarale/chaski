@@ -39,6 +39,10 @@ export class EmailService {
 		return this.accountStorage.deleteAccount(accountId);
 	}
 
+	async removeAccount(accountId: string): Promise<void> {
+		return this.deleteAccount(accountId);
+	}
+
 	async getGoogleAuthUrl(
 		clientId: string,
 		clientSecret: string,

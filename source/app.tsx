@@ -11,6 +11,7 @@ import EmailComposer from './components/EmailComposer.js';
 import CommandInput from './components/CommandInput.js';
 import {AddAccountDialog} from './components/AddAccountDialog.js';
 import {EditAccountView} from './components/EditAccountView.js';
+import {RemoveAccountDialog} from './components/RemoveAccountDialog.js';
 import {SettingsDialog} from './components/SettingsDialog.js';
 import {EmailService} from './services/emailService.js';
 import {SettingsService} from './services/settingsService.js';
@@ -47,6 +48,7 @@ type ViewMode =
 	| 'compose'
 	| 'addAccount'
 	| 'editAccount'
+	| 'removeAccount'
 	| 'settings';
 
 interface Message {
@@ -870,7 +872,7 @@ const App = () => {
 				setViewMode('editAccount');
 				break;
 			case '/remove-account':
-				handleRemoveAccount();
+				setViewMode('removeAccount');
 				break;
 			case '/settings':
 				setViewMode('settings');
@@ -1045,22 +1047,25 @@ const App = () => {
 		setViewMode('main');
 	};
 
-	const handleRemoveAccount = async () => {
-		if (emailAccounts.length === 0) {
-			console.log('No accounts to remove');
-			return;
+	const handleRemoveAccountComplete = async (accountId: string | null) => {
+		if (accountId) {
+			try {
+				await emailService.removeAccount(accountId);
+				const accounts = await emailService.getAccounts();
+				setEmailAccounts(accounts);
+
+				// If we removed the currently selected account, reset selection
+				if (selectedAccount === accountId) {
+					setAccount(accounts.length > 0 ? accounts[0]?.id : undefined);
+					setFolder('INBOX');
+				}
+
+				console.log('Account removed successfully!');
+			} catch (error) {
+				console.error('Failed to remove account:', error);
+			}
 		}
-
-		console.log('Available accounts:');
-		emailAccounts.forEach((acc, index) => {
-			console.log(`${index + 1}. ${acc.email} (${acc.provider})`);
-		});
-		console.log(
-			'\nType the number of the account to remove (or "cancel" to abort)',
-		);
-
-		// This is a simple implementation - in a real app you'd want a proper selection UI
-		// For now, users can use /add-account to re-add with correct settings
+		setViewMode('main');
 	};
 
 	// Render according to view mode
@@ -1122,6 +1127,14 @@ const App = () => {
 						setEmailAccounts(accounts);
 					}}
 					onCancel={() => setViewMode('main')}
+				/>
+			);
+
+		case 'removeAccount':
+			return (
+				<RemoveAccountDialog
+					accounts={emailAccounts}
+					onComplete={handleRemoveAccountComplete}
 				/>
 			);
 

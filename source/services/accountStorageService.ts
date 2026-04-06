@@ -160,6 +160,7 @@ export class AccountStorageService {
 		accountId: string,
 		accessToken: string,
 		refreshToken?: string,
+		tokenExpiry?: Date,
 	): Promise<void> {
 		const account = await this.getAccount(accountId);
 		if (!account?.oauth2Config) {
@@ -180,7 +181,8 @@ export class AccountStorageService {
 			);
 		}
 
-		account.oauth2Config.tokenExpiry = new Date(Date.now() + 3600 * 1000); // 1 hour
+		account.oauth2Config.tokenExpiry =
+			tokenExpiry ?? new Date(Date.now() + 3600 * 1000);
 		await this.saveAccount(account);
 	}
 

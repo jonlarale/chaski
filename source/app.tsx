@@ -18,6 +18,7 @@ import CommandInput from './components/CommandInput.js';
 import {AddAccountDialog} from './components/AddAccountDialog.js';
 import {EditAccountView} from './components/EditAccountView.js';
 import {RemoveAccountDialog} from './components/RemoveAccountDialog.js';
+import {ReLoginDialog} from './components/ReLoginDialog.js';
 import {SettingsDialog} from './components/SettingsDialog.js';
 import {EmailService} from './services/emailService.js';
 import {SettingsService} from './services/settingsService.js';
@@ -51,6 +52,7 @@ type ViewMode =
 	| 'addAccount'
 	| 'editAccount'
 	| 'removeAccount'
+	| 'reLogin'
 	| 'settings';
 
 type Message = {
@@ -922,6 +924,19 @@ function App() {
 				break;
 			}
 
+			case '/login': {
+				const oauthAccounts = emailAccounts.filter(
+					a => a.authType === 'oauth2',
+				);
+				if (oauthAccounts.length === 0) {
+					console.log('No OAuth2 accounts found. Use /add-account first.');
+				} else {
+					setViewMode('reLogin');
+				}
+
+				break;
+			}
+
 			case '/settings': {
 				setViewMode('settings');
 				break;
@@ -1089,6 +1104,7 @@ function App() {
 				console.log('/compose - Compose new email');
 				console.log('/add-account - Add a new email account');
 				console.log('/remove-account - Remove an email account');
+				console.log('/login - Re-authenticate an OAuth2 account');
 				console.log('/settings - Open settings');
 				console.log('/setpage <n> - Set messages per page');
 				console.log('/refresh - Refresh current folder');
@@ -1127,6 +1143,21 @@ function App() {
 				console.log(`Account ${account.email} added successfully!`);
 			} catch (error: unknown) {
 				console.error('Failed to add account:', error);
+			}
+		}
+
+		setViewMode('main');
+	};
+
+	const handleReLoginComplete = async (account: EmailAccount | undefined) => {
+		if (account) {
+			try {
+				await emailService.saveAccount(account);
+				const accounts = await emailService.getAccounts();
+				setEmailAccounts(accounts);
+				console.log(`Account ${account.email} re-authenticated successfully!`);
+			} catch (error: unknown) {
+				console.error('Failed to update account:', error);
 			}
 		}
 
@@ -1238,6 +1269,16 @@ function App() {
 				<RemoveAccountDialog
 					accounts={emailAccounts}
 					onComplete={handleRemoveAccountComplete}
+				/>
+			);
+		}
+
+		case 'reLogin': {
+			return (
+				<ReLoginDialog
+					accounts={emailAccounts.filter(a => a.authType === 'oauth2')}
+					emailService={emailService}
+					onComplete={handleReLoginComplete}
 				/>
 			);
 		}

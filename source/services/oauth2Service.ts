@@ -3,6 +3,12 @@ import {OAuth2Client} from 'google-auth-library';
 import {ConfidentialClientApplication} from '@azure/msal-node';
 import type {OAuth2Config} from '../types/email.js';
 
+export type RefreshResult = {
+	accessToken: string;
+	refreshToken?: string;
+	tokenExpiry?: Date;
+};
+
 function getRedirectUri(): string {
 	const port = process.env['OAUTH_CALLBACK_PORT'] ?? '3000';
 	const path = process.env['OAUTH_CALLBACK_PATH'] ?? '/oauth2/callback';
@@ -121,17 +127,36 @@ export class OAuth2Service {
 
 		const response = await this.msalClient.acquireTokenByCode(tokenRequest);
 
+		// Extract refresh token from MSAL's internal cache
+		let refreshToken = '';
+		try {
+			const cache = this.msalClient.getTokenCache().serialize();
+			const cacheData = JSON.parse(cache) as Record<
+				string,
+				Record<string, Record<string, string>>
+			>;
+			const refreshTokens = cacheData['RefreshToken'];
+			if (refreshTokens) {
+				const firstKey = Object.keys(refreshTokens)[0];
+				if (firstKey) {
+					refreshToken = refreshTokens[firstKey]!['secret'] ?? '';
+				}
+			}
+		} catch {
+			// If cache extraction fails, continue without refresh token
+		}
+
 		return {
 			provider: 'microsoft',
 			clientId,
 			clientSecret,
 			accessToken: response.accessToken,
-			refreshToken: '',
+			refreshToken,
 			tokenExpiry: response.expiresOn ?? undefined,
 		};
 	}
 
-	async refreshGoogleToken(oauth2Config: OAuth2Config): Promise<string> {
+	async refreshGoogleToken(oauth2Config: OAuth2Config): Promise<RefreshResult> {
 		const client = new OAuth2Client(
 			oauth2Config.clientId,
 			oauth2Config.clientSecret,
@@ -143,10 +168,18 @@ export class OAuth2Service {
 		});
 
 		const {credentials} = await client.refreshAccessToken();
-		return credentials.access_token ?? '';
+		return {
+			accessToken: credentials.access_token ?? '',
+			refreshToken: credentials.refresh_token ?? undefined,
+			tokenExpiry: credentials.expiry_date
+				? new Date(credentials.expiry_date)
+				: undefined,
+		};
 	}
 
-	async refreshMicrosoftToken(oauth2Config: OAuth2Config): Promise<string> {
+	async refreshMicrosoftToken(
+		oauth2Config: OAuth2Config,
+	): Promise<RefreshResult> {
 		const config = {
 			auth: {
 				clientId: oauth2Config.clientId,
@@ -168,6 +201,30 @@ export class OAuth2Service {
 		const response = await client.acquireTokenByRefreshToken(
 			refreshTokenRequest,
 		);
-		return response?.accessToken ?? '';
+
+		// Extract updated refresh token from MSAL cache
+		let refreshToken: string | undefined;
+		try {
+			const cache = client.getTokenCache().serialize();
+			const cacheData = JSON.parse(cache) as Record<
+				string,
+				Record<string, Record<string, string>>
+			>;
+			const refreshTokens = cacheData['RefreshToken'];
+			if (refreshTokens) {
+				const firstKey = Object.keys(refreshTokens)[0];
+				if (firstKey) {
+					refreshToken = refreshTokens[firstKey]!['secret'];
+				}
+			}
+		} catch {
+			// If cache extraction fails, continue without new refresh token
+		}
+
+		return {
+			accessToken: response?.accessToken ?? '',
+			refreshToken,
+			tokenExpiry: response?.expiresOn ?? undefined,
+		};
 	}
 }

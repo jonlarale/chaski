@@ -25,106 +25,49 @@ export class ImapService {
 	private readonly accountStorage = new AccountStorageService();
 
 	async connect(account: EmailAccount): Promise<void> {
-		let config: Imap.Config;
+		try {
+			await this.attemptConnect(account);
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message : String(error);
 
-		if (account.authType === 'oauth2' && account.oauth2Config) {
-			// Get fresh access token
-			let accessToken = account.oauth2Config.accessToken ?? '';
-
-			// Check if token needs refresh
+			// If auth failed and account is OAuth2, try refreshing token once
 			if (
-				account.oauth2Config.tokenExpiry &&
-				new Date() >= account.oauth2Config.tokenExpiry
+				account.authType === 'oauth2' &&
+				account.oauth2Config &&
+				this.isAuthError(message)
 			) {
-				if (account.oauth2Config.provider === 'google') {
-					accessToken = await this.oauth2Service.refreshGoogleToken(
-						account.oauth2Config,
-					);
-				} else {
-					accessToken = await this.oauth2Service.refreshMicrosoftToken(
-						account.oauth2Config,
-					);
-				}
-
-				await this.accountStorage.updateTokens(account.id, accessToken);
-			}
-
-			const xoauth2 = this.buildXoauth2String(account.email, accessToken);
-
-			config = {
-				user: account.email,
-				xoauth2,
-				password: '', // Required by types but not used with xoauth2
-				host:
-					account.imapConfig?.host ??
-					(account.provider === 'gmail'
-						? 'imap.gmail.com'
-						: 'outlook.office365.com'),
-				port: account.imapConfig?.port ?? 993,
-				tls: true,
-				tlsOptions: {rejectUnauthorized: false},
-			};
-		} else if (account.imapConfig) {
-			// For IMAP, use the full email as username if no username is specified
-			const username = account.imapConfig.username ?? account.email;
-
-			config = {
-				user: username,
-				password: account.imapConfig.password ?? '',
-				host: account.imapConfig.host,
-				port: account.imapConfig.port,
-				tls: account.imapConfig.secure,
-				tlsOptions: {rejectUnauthorized: false},
-				authTimeout: 10_000,
-				connTimeout: 10_000,
-			};
-
-			debugLog(
-				LogLevel.INFO,
-				'ImapService',
-				`Connecting to ${account.imapConfig.host} as ${username}...`,
-			);
-		} else {
-			throw new Error('No authentication configuration found');
-		}
-
-		this.imap = new Imap(config);
-
-		return new Promise((resolve, reject) => {
-			this.imap!.once('ready', () => {
 				debugLog(
 					LogLevel.INFO,
 					'ImapService',
-					'IMAP connection established successfully',
+					`Auth failed for ${account.email}, attempting token refresh...`,
 				);
-				resolve();
-			});
-			this.imap!.once('error', (error: Error) => {
-				debugLog(
-					LogLevel.ERROR,
-					'ImapService',
-					'IMAP connection error:',
-					error.message,
-				);
-				if (
-					error.message.includes('Access Denied') ||
-					error.message.includes('authentication')
-				) {
-					reject(
-						new Error(`Authentication failed. Please check:
-1. Username (might need full email address)
-2. Password is correct
-3. IMAP access is enabled for your account
-4. No 2FA/app-specific password required
 
-Original error: ${error.message}`),
-					);
-				} else {
-					reject(error);
+				const result =
+					account.oauth2Config.provider === 'google'
+						? await this.oauth2Service.refreshGoogleToken(account.oauth2Config)
+						: await this.oauth2Service.refreshMicrosoftToken(
+								account.oauth2Config,
+						  );
+
+				account.oauth2Config.accessToken = result.accessToken;
+				if (result.refreshToken) {
+					account.oauth2Config.refreshToken = result.refreshToken;
 				}
-			});
-			this.imap!.connect();
-		});
+
+				await this.accountStorage.updateTokens(
+					account.id,
+					result.accessToken,
+					result.refreshToken,
+					result.tokenExpiry,
+				);
+
+				// Reset imap instance and retry once
+				this.imap = undefined;
+				await this.attemptConnect(account);
+			} else {
+				throw error;
+			}
+		}
 	}
 
 	async disconnect(): Promise<void> {
@@ -670,6 +613,127 @@ Original error: ${error.message}`),
 					resolve([]);
 				}
 			});
+		});
+	}
+
+	private isAuthError(message: string): boolean {
+		const lower = message.toLowerCase();
+		return (
+			lower.includes('invalid credentials') ||
+			lower.includes('authenticationfailed') ||
+			lower.includes('access denied') ||
+			lower.includes('authentication failed')
+		);
+	}
+
+	private async attemptConnect(account: EmailAccount): Promise<void> {
+		let config: Imap.Config;
+
+		if (account.authType === 'oauth2' && account.oauth2Config) {
+			// Get fresh access token
+			let accessToken = account.oauth2Config.accessToken ?? '';
+
+			// Check if token needs refresh
+			if (
+				account.oauth2Config.tokenExpiry &&
+				new Date() >= account.oauth2Config.tokenExpiry
+			) {
+				const result =
+					account.oauth2Config.provider === 'google'
+						? await this.oauth2Service.refreshGoogleToken(account.oauth2Config)
+						: await this.oauth2Service.refreshMicrosoftToken(
+								account.oauth2Config,
+						  );
+
+				accessToken = result.accessToken;
+				account.oauth2Config.accessToken = accessToken;
+				if (result.refreshToken) {
+					account.oauth2Config.refreshToken = result.refreshToken;
+				}
+
+				await this.accountStorage.updateTokens(
+					account.id,
+					result.accessToken,
+					result.refreshToken,
+					result.tokenExpiry,
+				);
+			}
+
+			const xoauth2 = this.buildXoauth2String(account.email, accessToken);
+
+			config = {
+				user: account.email,
+				xoauth2,
+				password: '', // Required by types but not used with xoauth2
+				host:
+					account.imapConfig?.host ??
+					(account.provider === 'gmail'
+						? 'imap.gmail.com'
+						: 'outlook.office365.com'),
+				port: account.imapConfig?.port ?? 993,
+				tls: true,
+				tlsOptions: {rejectUnauthorized: false},
+			};
+		} else if (account.imapConfig) {
+			// For IMAP, use the full email as username if no username is specified
+			const username = account.imapConfig.username ?? account.email;
+
+			config = {
+				user: username,
+				password: account.imapConfig.password ?? '',
+				host: account.imapConfig.host,
+				port: account.imapConfig.port,
+				tls: account.imapConfig.secure,
+				tlsOptions: {rejectUnauthorized: false},
+				authTimeout: 10_000,
+				connTimeout: 10_000,
+			};
+
+			debugLog(
+				LogLevel.INFO,
+				'ImapService',
+				`Connecting to ${account.imapConfig.host} as ${username}...`,
+			);
+		} else {
+			throw new Error('No authentication configuration found');
+		}
+
+		this.imap = new Imap(config);
+
+		return new Promise((resolve, reject) => {
+			this.imap!.once('ready', () => {
+				debugLog(
+					LogLevel.INFO,
+					'ImapService',
+					'IMAP connection established successfully',
+				);
+				resolve();
+			});
+			this.imap!.once('error', (error: Error) => {
+				debugLog(
+					LogLevel.ERROR,
+					'ImapService',
+					'IMAP connection error:',
+					error.message,
+				);
+				if (
+					error.message.includes('Access Denied') ||
+					error.message.includes('authentication')
+				) {
+					reject(
+						new Error(`Authentication failed. Please check:
+1. Username (might need full email address)
+2. Password is correct
+3. IMAP access is enabled for your account
+4. No 2FA/app-specific password required
+
+Original error: ${error.message}`),
+					);
+				} else {
+					reject(error);
+				}
+			});
+			this.imap!.connect();
 		});
 	}
 

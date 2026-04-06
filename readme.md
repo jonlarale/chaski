@@ -400,6 +400,7 @@ Press `/` to open the command palette:
 | `/add-account`               | Add a new email account             |
 | `/edit-account`              | Edit existing account settings      |
 | `/remove-account`            | Remove an email account             |
+| `/login`                     | Re-authenticate an OAuth2 account   |
 | `/compose`                   | Compose a new email                 |
 | `/refresh`                   | Refresh current folder              |
 | `/refresh-all`               | Refresh all folders                 |
@@ -524,6 +525,27 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Changelog
+
+### v0.4.0
+
+- **`/login` command** — Re-authenticate OAuth2 accounts when tokens expire without removing and re-adding the account
+- **Automatic token refresh retry** — IMAP and SMTP connections now retry once with a fresh token when authentication fails, instead of failing immediately
+- **Microsoft OAuth2 refresh token fix** — Refresh tokens are now properly extracted and stored for Outlook/Office 365 accounts, enabling automatic token renewal
+- **Accurate token expiry** — Token expiry is now taken from the OAuth2 provider response instead of using a hardcoded 1-hour value
+
+### v0.3.2
+
+- Configurable OpenAI model for the AI assistant
+
+### v0.3.1
+
+- OAuth2 flow, connection validation, and MCP account management
+
+### v0.3.0
+
+- MCP server, account management, and codebase quality improvements
 
 ## Sponsoring
 

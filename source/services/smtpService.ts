@@ -1,6 +1,7 @@
 import type {Buffer} from 'node:buffer';
 import nodemailer from 'nodemailer';
 import type {EmailAccount} from '../types/email.js';
+import {debugLog, LogLevel} from '../utils/debug-core.js';
 import {OAuth2Service} from './oauth2Service.js';
 import {AccountStorageService} from './accountStorageService.js';
 
@@ -28,70 +29,49 @@ export class SmtpService {
 	private readonly accountStorage = new AccountStorageService();
 
 	async connect(account: EmailAccount): Promise<void> {
-		let transportOptions: any;
+		try {
+			await this.attemptConnect(account);
+		} catch (error: unknown) {
+			const message = error instanceof Error ? error.message : String(error);
 
-		if (account.authType === 'oauth2' && account.oauth2Config) {
-			// Get fresh access token
-			let accessToken = account.oauth2Config.accessToken ?? '';
-
-			// Check if token needs refresh
+			// If auth failed and account is OAuth2, try refreshing token once
 			if (
-				account.oauth2Config.tokenExpiry &&
-				new Date() >= account.oauth2Config.tokenExpiry
+				account.authType === 'oauth2' &&
+				account.oauth2Config &&
+				this.isAuthError(message)
 			) {
-				if (account.oauth2Config.provider === 'google') {
-					accessToken = await this.oauth2Service.refreshGoogleToken(
-						account.oauth2Config,
-					);
-				} else {
-					accessToken = await this.oauth2Service.refreshMicrosoftToken(
-						account.oauth2Config,
-					);
+				debugLog(
+					LogLevel.INFO,
+					'SmtpService',
+					`Auth failed for ${account.email}, attempting token refresh...`,
+				);
+
+				const result =
+					account.oauth2Config.provider === 'google'
+						? await this.oauth2Service.refreshGoogleToken(account.oauth2Config)
+						: await this.oauth2Service.refreshMicrosoftToken(
+								account.oauth2Config,
+						  );
+
+				account.oauth2Config.accessToken = result.accessToken;
+				if (result.refreshToken) {
+					account.oauth2Config.refreshToken = result.refreshToken;
 				}
 
-				await this.accountStorage.updateTokens(account.id, accessToken);
+				await this.accountStorage.updateTokens(
+					account.id,
+					result.accessToken,
+					result.refreshToken,
+					result.tokenExpiry,
+				);
+
+				// Reset transporter and retry once
+				this.transporter = undefined;
+				await this.attemptConnect(account);
+			} else {
+				throw error;
 			}
-
-			const service = account.provider === 'gmail' ? 'gmail' : undefined;
-			const host =
-				account.smtpConfig?.host ??
-				(account.provider === 'gmail'
-					? 'smtp.gmail.com'
-					: 'smtp.office365.com');
-			const port = account.smtpConfig?.port ?? 587;
-
-			transportOptions = {
-				service,
-				host,
-				port,
-				secure: port === 465,
-				auth: {
-					type: 'OAuth2',
-					user: account.email,
-					clientId: account.oauth2Config.clientId,
-					clientSecret: account.oauth2Config.clientSecret,
-					refreshToken: account.oauth2Config.refreshToken,
-					accessToken,
-				},
-			};
-		} else if (account.smtpConfig) {
-			transportOptions = {
-				host: account.smtpConfig.host,
-				port: account.smtpConfig.port,
-				secure: account.smtpConfig.secure,
-				auth: {
-					user: account.smtpConfig.username ?? account.email,
-					pass: account.smtpConfig.password ?? '',
-				},
-			};
-		} else {
-			throw new Error('No SMTP configuration found');
 		}
-
-		this.transporter = nodemailer.createTransport(transportOptions);
-
-		// Verify connection
-		await this.transporter.verify();
 	}
 
 	async sendMail(options: SendMailOptions): Promise<string> {
@@ -135,5 +115,90 @@ export class SmtpService {
 			this.transporter.close();
 			this.transporter = undefined;
 		}
+	}
+
+	private isAuthError(message: string): boolean {
+		const lower = message.toLowerCase();
+		return (
+			lower.includes('invalid credentials') ||
+			lower.includes('authenticationfailed') ||
+			lower.includes('access denied') ||
+			lower.includes('authentication failed')
+		);
+	}
+
+	private async attemptConnect(account: EmailAccount): Promise<void> {
+		let transportOptions: any;
+
+		if (account.authType === 'oauth2' && account.oauth2Config) {
+			// Get fresh access token
+			let accessToken = account.oauth2Config.accessToken ?? '';
+
+			// Check if token needs refresh
+			if (
+				account.oauth2Config.tokenExpiry &&
+				new Date() >= account.oauth2Config.tokenExpiry
+			) {
+				const result =
+					account.oauth2Config.provider === 'google'
+						? await this.oauth2Service.refreshGoogleToken(account.oauth2Config)
+						: await this.oauth2Service.refreshMicrosoftToken(
+								account.oauth2Config,
+						  );
+
+				accessToken = result.accessToken;
+				account.oauth2Config.accessToken = accessToken;
+				if (result.refreshToken) {
+					account.oauth2Config.refreshToken = result.refreshToken;
+				}
+
+				await this.accountStorage.updateTokens(
+					account.id,
+					result.accessToken,
+					result.refreshToken,
+					result.tokenExpiry,
+				);
+			}
+
+			const service = account.provider === 'gmail' ? 'gmail' : undefined;
+			const host =
+				account.smtpConfig?.host ??
+				(account.provider === 'gmail'
+					? 'smtp.gmail.com'
+					: 'smtp.office365.com');
+			const port = account.smtpConfig?.port ?? 587;
+
+			transportOptions = {
+				service,
+				host,
+				port,
+				secure: port === 465,
+				auth: {
+					type: 'OAuth2',
+					user: account.email,
+					clientId: account.oauth2Config.clientId,
+					clientSecret: account.oauth2Config.clientSecret,
+					refreshToken: account.oauth2Config.refreshToken,
+					accessToken,
+				},
+			};
+		} else if (account.smtpConfig) {
+			transportOptions = {
+				host: account.smtpConfig.host,
+				port: account.smtpConfig.port,
+				secure: account.smtpConfig.secure,
+				auth: {
+					user: account.smtpConfig.username ?? account.email,
+					pass: account.smtpConfig.password ?? '',
+				},
+			};
+		} else {
+			throw new Error('No SMTP configuration found');
+		}
+
+		this.transporter = nodemailer.createTransport(transportOptions);
+
+		// Verify connection
+		await this.transporter.verify();
 	}
 }
